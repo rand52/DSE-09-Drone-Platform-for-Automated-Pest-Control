@@ -1,0 +1,21 @@
+# Virtual env
+.venv/
+.env
+
+# Python - fuck the .pyc files
+__pycache__/
+*.pyc
+
+# IDE and editor settings - Pycharm and Vscode
+.idea/
+.vscode/
+
+# Pytest cache
+.pytest_cache/
+
+# Claude users, copilot doesn't create it's session files yet
+.claude/
+
+# Temporary files, ex. excel, word, etc. while being edited
+~$*
+
