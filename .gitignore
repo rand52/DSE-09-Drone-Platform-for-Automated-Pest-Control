@@ -19,3 +19,5 @@ __pycache__/
 # Temporary files, ex. excel, word, etc. while being edited
 ~$*
 
+# CSV files
+*.csv
