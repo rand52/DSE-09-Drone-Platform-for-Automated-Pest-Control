@@ -21,3 +21,6 @@ __pycache__/
 
 # CSV files
 *.csv
+
+# The drone training data
+pats_dataset_drone_training
