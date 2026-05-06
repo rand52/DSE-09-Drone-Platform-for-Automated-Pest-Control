@@ -1,0 +1,24 @@
+MyProp_v1
+
+ 5 ! Nblades
+
+ 0.3931 9.5157 ! CL0 CLa
+ -0.3177 1.3863 ! CLmin CLmax
+
+ 0.01593 0.02 0.02882 1.2127 ! CD0 CD2u CD2l CLCD0
+ 100000 -0.5 ! REref REexp
+
+ 0.0 0.5 1.0 ! XIdes
+ 0.0 0.5 0.4 ! CLdes
+
+ 0.0044 ! hub radius
+ 0.044 ! tip radius
+ 10 ! speed
+ 30000.0 ! rpm
+
+ 2.4525 ! Thrust
+ 0 ! Power
+
+ 0 0 ! Ldes KQdes
+
+ 30 ! Nout
