@@ -4,21 +4,21 @@ import os
 class QMILInterface:
     def __init__(self, name="Propeller"):
         self.name = name
-        self.n_blades = 2
+        self.n_blades = 3
         # Airfoil characteristics
-        self.cl_params = {"cl0": 0.0, "cl_a": 6.2832, "cl_min": -0.8, "cl_max": 1.2}
-        self.cd_params = {"cd0": 0.01, "cd2u": 0.008, "cd2l": 0.006, "clcd0": 0.4}
-        self.re_params = {"re_ref": 150000.0, "re_exp": -0.5}
+        self.cl_params = {"cl0": 0.3931, "cl_a": 9.5157, "cl_min": -0.3177, "cl_max": 1.3863}
+        self.cd_params = {"cd0": 0.01593, "cd2u": 0.02000, "cd2l": 0.02882, "clcd0": 1.2127}
+        self.re_params = {"re_ref": 100000, "re_exp": -0.5}
         # Design distribution (r/R and CL)
         self.dist_r_R = [0.0, 0.5, 1.0]
-        self.dist_cl = [0.6, 0.5, 0.4]
+        self.dist_cl = [0.0, 0.5, 0.4]
         # Operating points
-        self.radii = {"hub": 0.05, "tip": 1.50}
-        self.op_point = {"vel": 8.0, "rpm": 240.0}
-        self.targets = {"thrust": 0.0, "power": 500.0} # Use 0 for the one not specified
+        self.radii = {"hub": 0.0044, "tip": 0.044}
+        self.op_point = {"vel": 10, "rpm": 30000.0}
+        self.targets = {"thrust": 2.4525, "power": 0} # Use 0 for the one not specified
         # Design options
         self.ldes = 0  # 0=Min Induced Loss, 2=Windmill Max Power
-        self.kqdes = 0.2
+        self.kqdes = 0
         self.n_out = 30
 
     def write_input_file(self, filename="qmil.inp"):
@@ -46,7 +46,7 @@ class QPROPInterface:
         self.motor_name = motor_name
         self.motor_type = 1 # Type 1 = Standard brushed DC
         # Motor Params (R, Io, Kv)
-        self.params = [0.31, 0.77, 2760.0]
+        self.params = [0.221, 0.38, 1700]
 
     def write_motor_file(self, filename="motor.dat"):
         with open(filename, 'w') as f:
@@ -83,16 +83,16 @@ def run_software(qmil_obj, qprop_obj, vel, rpm, volt):
 if __name__ == "__main__":
     # Define variables in code
     design = QMILInterface("MyProp_v1")
-    design.n_blades = 3
-    design.op_point['rpm'] = 300.0
-    design.targets['power'] = 450.0  # Design for 450W
+    # design.n_blades = 3
+    # design.op_point['rpm'] = 300.0
+    # design.targets['power'] = 450.0  # Design for 450W
     
     motor = QPROPInterface("Speed-400")
-    motor.params = [0.35, 0.8, 2500.0] # Resistance, Io, Kv
+    motor.params = [0.221, 0.38, 1700] # Resistance, Io, Kv
     
     # Run the simulation
     # Analyzes performance at 10 m/s, using the motor at 12V
-    output = run_software(design, motor, vel=10.0, rpm=0, volt=12.0)
+    output = run_software(design, motor, vel=0.0, rpm=0, volt=23.5)
     
     print("\nQPROP Output Results:")
     print(output)
