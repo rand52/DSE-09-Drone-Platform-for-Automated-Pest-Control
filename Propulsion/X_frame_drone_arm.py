@@ -12,7 +12,7 @@ E     = 70e9
 n_sec = 200
 
 # ── Cross-section ─────────────────────────────────────────────────────────────
-CS_TYPE = 'ibeam'      # 'rect' | 'circle' | 'hollow_circle' | 'ibeam'
+CS_TYPE = 'rect'      # 'rect' | 'circle' | 'hollow_circle' | 'ibeam'
 
 # rect:          a=width,          b=height
 # circle:        a=outer diam,     b=ignored
