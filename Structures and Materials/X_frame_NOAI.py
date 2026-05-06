@@ -1,14 +1,14 @@
 import numpy as np
 
 # geometry definition: a=width (x global), b=height (y global), forms the xy-plane, z is out of plane.
-a = 75e-3 # m, True-X
+a = 75e-3   #  m, True-X
 b = 75e-3 # m, True-X
 phi_list = np.linspace(0,np.pi/2,90) # all angles of the arm (in-plane as well)
 phi = phi_list[len(phi_list)//2] # m, angle of the arm with respect to x-axis, so 45 degrees for True-X
 
 # Beam definition
-t = 3e-3 # m, thickness of the arm (for stress calculations)
-w = 20e-3 # m, width of the arm (for stress calculations)
+t = 3e-3    # m, thickness of the arm (for stress calculations)
+w = 20e-3   # m, width of the arm (for stress calculations)
 
 L = np.sqrt((a/2)**2 + (b/2)**2) # m, length of each arm'
 A = w * t # m^2, cross-sectional area of the arm
