@@ -80,7 +80,7 @@ w = (Fz / (6*E*Iy)) * (3*L*s**2 - s**3)
 pts_def = np.outer(s+u, e_x) + np.outer(v, e_y) + np.outer(w, e_z)
 tip_def = pts_def[-1]
 
-# ── Stress grid & mask ────────────────────────────────────────────────────────
+# ── Stress grid & mask ──
 if CS_TYPE == 'ibeam':
     half_y, half_z = a_cs/2, b_cs/2
 elif r_o:
