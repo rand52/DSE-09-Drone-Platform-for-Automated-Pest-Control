@@ -17,20 +17,19 @@ from matplotlib.widgets import Slider, Button
 # MEASURED DATA  (Throttle%, Thrust N, Voltage V, Current A, RPM, Power W, Eff g/W)
 # ──────────────────────────────────────────────────────────────
 MEASURED = np.array([
-    [50,  1.738, 16.82, 2.94,  18867, 49.45,  3.58],
-    [55,  2.042, 16.82, 3.57,  20324, 60.05,  3.47],
-    [60,  2.369, 16.81, 4.29,  21796, 72.11,  3.35],
-    [65,  2.709, 16.80, 5.05,  23130, 84.84,  3.26],
-    [70,  3.034, 16.79, 5.92,  24519, 99.40,  3.11],
-    [75,  3.339, 16.78, 6.69,  25627, 112.26, 3.03],
-    [80,  3.622, 16.77, 7.51,  26720, 125.94, 2.93],
-    [85,  3.996, 16.76, 8.55,  27903, 143.30, 2.84],
-    [90,  4.396, 16.75, 9.77,  29249, 163.65, 2.74],
-    [95,  4.787, 16.73, 11.04, 30352, 184.70, 2.64],
-    [100, 5.208, 16.71, 12.45, 31361, 208.04, 2.55],
+    [10,  0.0078, 3.7, 0.3, 6783,  1.2,  0.65],
+    [20,  0.0216, 3.7, 0.6, 12250, 2.2,  1.00],
+    [30,  0.0677, 3.7, 1.0, 17183, 3.8,  1.85],
+    [40,  0.1059, 3.7, 1.5, 21883, 5.7,  1.89],
+    [50,  0.1530, 3.7, 2.2, 25583, 8.2,  1.89],
+    [60,  0.1863, 3.7, 2.9, 28416, 10.8, 1.76],
+    [70,  0.2324, 3.7, 3.8, 31150, 14.0, 1.69],
+    [80,  0.2589, 3.7, 4.7, 33900, 17.2, 1.53],
+    [90,  0.3128, 3.7, 5.8, 36100, 21.5, 1.48],
+    [100, 0.3589, 3.7, 6.9, 38466, 25.6, 1.43],
 ])
 MEAS_RPM    = MEASURED[:, 4]
-MEAS_THRUST = MEASURED[:, 1]
+MEAS_THRUST = MEASURED[:, 1]    
 MEAS_POWER  = MEASURED[:, 5]
 MEAS_VOLT   = MEASURED[:, 2]
 
@@ -39,27 +38,27 @@ MEAS_VOLT   = MEASURED[:, 2]
 # DEFAULT PARAMETERS
 # ──────────────────────────────────────────────────────────────
 DEFAULTS = {
-    "cl0":    0.4222,
+    "cl0":    0.4171,
     "cl_a":   5.19,
     "cl_min": -0.35,
     "cl_max": 1.4,
-    "cd0":    0.2,
+    "cd0":    0.11,
     "cd2u":   0.018,
     "cd2l":   0.06,
     "clcd0":  0.49,
     "re_ref": 50000,
-    "re_exp": -1.5,
+    "re_exp": -0.27,
 }
 
 # Motor (Speed-400 equivalent)
-MOTOR_R  = 0.141   # Ohm
-MOTOR_IO = 0.62    # A
-MOTOR_KV = 2800    # rpm/V
+MOTOR_R  = 0.078  # Ohm
+MOTOR_IO = 2.3    # A
+MOTOR_KV = 22000    # rpm/V
 
 # Prop geometry
 N_BLADES = 3
-R_HUB    = 0.0044
-R_TIP    = 0.044
+R_HUB    = 0.00075
+R_TIP    = 0.02
 
 # Simulation sweep: use measured voltages, sweep rpm range
 RPM_SWEEP = np.linspace(15000, 33000, 40)
@@ -81,9 +80,9 @@ def write_prop_input(params, filename):
         " 0.0 0.5 0.4 ! CLdes\n\n",
         f" {R_HUB} ! hub radius\n",
         f" {R_TIP} ! tip radius\n",
-        " 10 ! speed\n",
-        " 30000 ! rpm\n\n",
-        " 1.4715 ! Thrust\n",
+        " 0 ! speed\n",
+        " 40000 ! rpm\n\n",
+        " 0.4 ! Thrust\n",
         " 0 ! Power\n\n",
         " 0 0 ! Ldes KQdes\n\n",
         " 30 ! Nout\n",
@@ -124,11 +123,11 @@ def run_simulation(params):
                 raise FileNotFoundError("qmil produced no output")
         except Exception as e:
             print(f"[WARN] qmil failed ({e}), using analytic fallback")
-            return analytic_model(params)
+            return
 
         # --- QPROP sweep ---
         # Build voltage string covering our measured range
-        volt_str = f"8,16/11"
+        volt_str = f"0.37,3.7/11"
         try:
             r = subprocess.run(
                 ["qprop", prop_f, motor_f, "0", "0", volt_str],
@@ -137,7 +136,7 @@ def run_simulation(params):
             return parse_qprop_output(r.stdout)
         except Exception as e:
             print(f"[WARN] qprop failed ({e}), using analytic fallback")
-            return analytic_model(params)
+            return 
 
 
 def parse_qprop_output(text):
@@ -153,7 +152,7 @@ def parse_qprop_output(text):
         try:
             rpms.append(float(parts[1]))
             thrusts.append(float(parts[3]))
-            powers.append(float(parts[5]))
+            powers.append(float(parts[15]))
         except ValueError:
             continue
     if not rpms:

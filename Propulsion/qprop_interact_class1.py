@@ -7,16 +7,16 @@ class QMILInterface:
         self.name = name
         self.n_blades = 3
         # Airfoil characteristics
-        self.cl_params = {"cl0": 0.4222, "cl_a": 5.19, "cl_min": -0.35, "cl_max": 1.4}
-        self.cd_params = {"cd0": 0.2, "cd2u": 0.018, "cd2l": 0.06, "clcd0": 0.49}
-        self.re_params = {"re_ref": 50000, "re_exp": -1.5}
+        self.cl_params = {"cl0": 0.4171, "cl_a": 5.19, "cl_min": -0.35, "cl_max": 1.4}
+        self.cd_params = {"cd0": 0.0485, "cd2u": 0.018, "cd2l": 0.06, "clcd0": 0.49}
+        self.re_params = {"re_ref": 50000, "re_exp": -0.27}
         # Design distribution (r/R and CL)
         self.dist_r_R = [0.0, 0.5, 1.0]
         self.dist_cl = [0.0, 0.5, 0.4]
         # Operating points
         self.radii = {"hub": 0.0044, "tip": 0.044}
-        self.op_point = {"vel": 10, "rpm": 30000.0}
-        self.targets = {"thrust": 1.4715, "power": 0} # Use 0 for the one not specified
+        self.op_point = {"vel": 5, "rpm": 30000.0}
+        self.targets = {"thrust": 5, "power": 0} # Use 0 for the one not specified
         # Design options
         self.ldes = 0  # 0=Min Induced Loss, 2=Windmill Max Power
         self.kqdes = 0
@@ -89,10 +89,10 @@ if __name__ == "__main__":
     design = QMILInterface("MyProp_v1")
     
     motor = QPROPInterface("Speed-400")
-    motor.params = [0.141, 0.62, 2800] # Resistance, Io, Kv
+    motor.params = [0.141, 0.62,2800] # Resistance, Io, Kv
     
     # Run the simulation
-    output = run_software(design, motor, vel="0", rpm=0, volt="8,16/11")
+    output = run_software(design, motor, vel="-5,5/2", rpm="30000", volt=0)
     
     print("\nQPROP Output Results:")
     print(output)
