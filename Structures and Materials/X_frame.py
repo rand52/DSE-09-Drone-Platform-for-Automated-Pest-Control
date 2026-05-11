@@ -7,12 +7,12 @@ sigma_yield = 200e6     # [Pa] yield strength of aluminum
 
 # Force definition
 F = 100                 # [N]
-psi = np.radians(40)    # [rad]
-chi = np.radians(20)     # [rad]
+psi = np.radians(np.linspace(-180, 90, 271))  # [rad], 270,
+chi = np.radians(np.linspace(-90, 90, 181))    # [rad]
 
 # Discretization
-disc_x = 100            # mesh point in x direction
-disc_z = 100            # mesh point in y direction
+disc_x = 50            # mesh point in x direction
+disc_z = 50            # mesh point in y direction
 
 t = 5 / 1000            # [m] arm height in y-direction
 w = 20 / 1000           # [m] arm width in x-direction
@@ -32,7 +32,7 @@ def drone_geometry(t, w, a = None, b= None, L=None, phi = None):
         b = 2 * L * np.sin(phi/2)
     else:
         L = np.sqrt(a**2 + b**2) / 2
-        phi = 2 * np.atan2(b/2, a/2)
+        phi = 2 * np.asin(b/2 / L)
 
     A = w * t                   # [m^2], cross-sectional area of the arm
     Ixx = (w * t ** 3) / 12     # [m^4], second moment of area about beam x-axis
@@ -59,20 +59,22 @@ def internal_loads(l):
     if l < 0 or l > geometry["L"]:
         raise ValueError(f'Value outside arm length (0,{geometry["L"]})')
 
+    psi_eff = psi - geometry["phi"] / 2  # Now it takes the arm angle into account
     Fz = F * np.sin(chi)
-    Fx = F * np.cos(chi) * np.sin(psi)
-    Fy = F * np.cos(chi) * np.cos(psi)
+    Fx = F * np.sin(psi_eff)[:, np.newaxis] * np.cos(chi) # Creates a new column for every chi angle, so that we have every combination of psi and chi. AI came up with this function when i asked for a more elegant way instead of using a bunch of for loops
+    Fy = F * np.cos(psi_eff)[:, np.newaxis] * np.cos(chi) # See comment above
     Mx = - Fz * l   # negative sign, coz Mx + Fz*l =0
     Mz = - Fx * l   # negative sign, coz Mz + Fx*l =0
     #print(Fz,Fx,Fy,Mx,Mz)
-
+    # print("Fx:", Fx)
+    
     return {
         "l": l,         # [m] distance from arm tip
-        "Fx": Fx,       # [N] force in x-direction
-        "Fy": Fy,       # [N] force in y-direction
-        "Fz": Fz,       # [N] force in z-direction
-        "Mx": Mx,       # [Nm] moment about x-axis
-        "Mz": Mz        # [Nm] moment about z-axis
+        "Fx": Fx,       # [N] force in x-direction, shape = (271, 181), rows correspond to psi, columns correspond to chi
+        "Fy": Fy,       # [N] force in y-direction, see above
+        "Fz": Fz,       # [N] force in z-direction, shape = (181,), rows correspond to chi
+        "Mx": Mx,       # [Nm] moment about x-axis, see above
+        "Mz": Mz        # [Nm] moment about z-axis, see see Fx
     }
 
 def plot_stresses(l):
@@ -105,27 +107,39 @@ def plot_stresses(l):
     # Normal stress superposition
     # sigma= Fz/A + Mx*z/Ixx + Mz*x/Izz
     sigma_axial = loads["Fy"] / A
-    sigma_bending_on_x = loads["Mx"] * Z / geometry["Ixx"]
-    sigma_bending_on_y = loads["Mz"] * X / geometry["Izz"]
+    sigma_bending_on_x = loads["Mx"][np.newaxis, :, np.newaxis, np.newaxis] * Z[np.newaxis, np.newaxis, :, :] / geometry["Ixx"]
+    print("Mx:", loads["Mx"])
+    print("Z:", Z)
+    print("Bending Stress x size:", sigma_bending_on_x.shape)
+    sigma_bending_on_y = loads["Mz"][:, :, np.newaxis, np.newaxis] * X[np.newaxis, np.newaxis, :, :] / geometry["Izz"]
+    # print("Bending Stress y:",sigma_bending_on_y)
+    
+    sigma_axial = sigma_axial[:, :, np.newaxis, np.newaxis] # REshape to (271, 181, 1\, 1)
     sigma_yy = sigma_axial + sigma_bending_on_x + sigma_bending_on_y
 
     # Shear stresses
-    tau_yx = (2 * loads["Fz"] / geometry["Ixx"]) * (geometry["t"]**2 / 4 - Z**2)
-    tau_yz = (2 * loads["Fx"] / geometry["Izz"]) * (geometry["w"]**2 / 4 - X**2)
+    tau_yx = (2 * loads["Fz"] / geometry["Ixx"])[np.newaxis, :, np.newaxis, np.newaxis] * (geometry["t"]**2 / 4 - Z**2)[np.newaxis, np.newaxis, :, :]
+    tau_yz = (2 * loads["Fx"] / geometry["Izz"])[:, :, np.newaxis, np.newaxis] * (geometry["w"]**2 / 4 - X**2)[np.newaxis, np.newaxis, :, :]
 
     # von Misses stress
-    sigma_misses = np.sqrt(sigma_yy**2 + 3*tau_yx**2 + 3*tau_yz**2)
+    sigma_misses = np.sqrt(sigma_yy**2 + 3*tau_yx**2+ 3*tau_yz**2)
 
     # Max stress
     sigma_normal_max = np.max(np.abs(sigma_yy))
+    ind_norm = np.unravel_index(np.argmax(np.abs(sigma_yy)), sigma_yy.shape)
+    ind_norm_sign = np.sign(sigma_yy[ind_norm]) # 1 for tension, -1 for compression
     sigma_misses_max = np.max(np.abs(sigma_misses))
+    ind_misses = np.unravel_index(np.argmax(np.abs(sigma_misses)), sigma_misses.shape)
+    ind_misses_sign = np.sign(sigma_misses[ind_misses]) # 1 for tension, -1 for compression
+    # AI autocompleted this for me :). I did check it. Argmax turns sigma_yy into a 1d array and then finds the index of the maximum value, then adding sigma_misses.shape turns the index from the 1d variant into the 4d variant
 
+    print(f'Max normal stress of, {np.round(sigma_normal_max / 1e6, 2)}, MPa, at psi = {np.round(np.degrees(psi[ind_norm[0]]), 2)} deg, chi = {np.round(np.degrees(chi[ind_norm[1]]), 2)} deg, sign: {"tension" if ind_norm_sign == 1 else "compression"}')
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
 
     # Plot the normal stresses
     # cmap='bwr_r' gives +=blue (tension) and -=red (compression)
-    color_bar_1_ref = ax1.pcolormesh(X * 1000, Z * 1000, sigma_yy / 1e6, cmap='bwr_r', vmin=-np.abs(sigma_normal_max / 1e6), vmax=np.abs(sigma_normal_max / 1e6))
+    color_bar_1_ref = ax1.pcolormesh(X * 1000, Z * 1000, sigma_yy[ind_norm[0], ind_norm[1], :, :] / 1e6, cmap='bwr_r', vmin=-np.abs(sigma_normal_max / 1e6), vmax=np.abs(sigma_normal_max / 1e6))
 
     # Invert x-axis to be consistent with our coord definition
     ax1.invert_xaxis()
@@ -141,7 +155,7 @@ def plot_stresses(l):
     ax1.axis('equal')
 
     # Plot the von Misses stress
-    color_bar_2_ref = ax2.pcolormesh(X * 1000, Z * 1000, sigma_misses / 1e6, cmap='bwr_r', vmin=-np.abs(sigma_misses_max / 1e6), vmax=np.abs(sigma_misses_max / 1e6))
+    color_bar_2_ref = ax2.pcolormesh(X * 1000, Z * 1000, sigma_misses[ind_misses[0], ind_misses[1], :, :] / 1e6, cmap='bwr_r', vmin=-np.abs(sigma_misses_max / 1e6), vmax=np.abs(sigma_misses_max / 1e6))
     ax2.invert_xaxis()
     # Add the max stress
     ax2.text(10, 12, f'stress_von_Misses_max = {np.round(sigma_misses_max / 1e6, 2)} MPa', fontsize=10)
