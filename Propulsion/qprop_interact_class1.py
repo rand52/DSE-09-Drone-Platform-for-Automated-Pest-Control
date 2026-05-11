@@ -1,21 +1,22 @@
 import subprocess
 import os
+import numpy as np
 
 class QMILInterface:
     def __init__(self, name="Propeller"):
         self.name = name
         self.n_blades = 3
         # Airfoil characteristics
-        self.cl_params = {"cl0": 0.3931, "cl_a": 9.5157, "cl_min": -0.3177, "cl_max": 1.3863}
-        self.cd_params = {"cd0": 0.01593, "cd2u": 0.02000, "cd2l": 0.02882, "clcd0": 1.2127}
-        self.re_params = {"re_ref": 100000, "re_exp": -0.5}
+        self.cl_params = {"cl0": 0.4171, "cl_a": 5.19, "cl_min": -0.35, "cl_max": 1.4}
+        self.cd_params = {"cd0": 0.0485, "cd2u": 0.018, "cd2l": 0.06, "clcd0": 0.49}
+        self.re_params = {"re_ref": 50000, "re_exp": -0.27}
         # Design distribution (r/R and CL)
         self.dist_r_R = [0.0, 0.5, 1.0]
         self.dist_cl = [0.0, 0.5, 0.4]
         # Operating points
         self.radii = {"hub": 0.0044, "tip": 0.044}
-        self.op_point = {"vel": 10, "rpm": 30000.0}
-        self.targets = {"thrust": 2.4525, "power": 0} # Use 0 for the one not specified
+        self.op_point = {"vel": 5, "rpm": 30000.0}
+        self.targets = {"thrust": 5, "power": 0} # Use 0 for the one not specified
         # Design options
         self.ldes = 0  # 0=Min Induced Loss, 2=Windmill Max Power
         self.kqdes = 0
@@ -56,7 +57,7 @@ class QPROPInterface:
                 f.write(f" {p}\n")
         return filename
 
-def run_software(qmil_obj, qprop_obj, vel, rpm, volt):
+def run_software(qmil_obj, qprop_obj, vel, rpm, volt, output_file=os.path.join(os.getcwd(), "results", "qprop_output.txt")):
     """Executes the QMIL -> QPROP workflow"""
     
     # 1. Generate QMIL files and run
@@ -76,6 +77,9 @@ def run_software(qmil_obj, qprop_obj, vel, rpm, volt):
         ["qprop", prop_file, motor_file, str(vel), str(rpm), str(volt)],
         capture_output=True, text=True
     )
+    with open(output_file, 'w') as f:
+        f.write(result.stdout)
+    print(f"Results saved to {output_file}")
     
     return result.stdout
 
@@ -83,16 +87,12 @@ def run_software(qmil_obj, qprop_obj, vel, rpm, volt):
 if __name__ == "__main__":
     # Define variables in code
     design = QMILInterface("MyProp_v1")
-    # design.n_blades = 3
-    # design.op_point['rpm'] = 300.0
-    # design.targets['power'] = 450.0  # Design for 450W
     
     motor = QPROPInterface("Speed-400")
-    motor.params = [0.221, 0.38, 1700] # Resistance, Io, Kv
+    motor.params = [0.141, 0.62,2800] # Resistance, Io, Kv
     
     # Run the simulation
-    # Analyzes performance at 10 m/s, using the motor at 12V
-    output = run_software(design, motor, vel=0.0, rpm=0, volt=23.5)
+    output = run_software(design, motor, vel="-5,5/2", rpm="30000", volt=0)
     
     print("\nQPROP Output Results:")
     print(output)
