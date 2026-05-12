@@ -68,22 +68,28 @@ m_power_requirement = P_peak / (percentage_first_source * P_density_source1 + (1
 total_mass = np.maximum(m_energy_requirement,m_power_requirement)
 
 minimum_mass = np.min(total_mass)
-minimum_mass_index = np.argmin(minimum_mass)
+minimum_mass_index = np.argmin(total_mass)
 minimum_mass_fraction = percentage_first_source[minimum_mass_index]
+
+# For plotting 
+
+source_names = {1: 'Li-ion', 2: 'LiPo', 3: 'Supercap'}
+name1 = source_names[comb1]
+name2 = source_names[comb2]
 
 fig,ax = plt.subplots(2,1,figsize=(9,5))
 
 ax[0].plot(percentage_first_source, m_energy_requirement, label='Energy requirement', color='blue', linewidth=2)
 ax[0].plot(percentage_first_source, m_power_requirement, label='Power requirement', color='orange', linewidth=2)
-ax[1].plot(percentage_first_source,total_mass,label='Minimum weight',color='red',linestyle='--')
+ax[1].plot(percentage_first_source, total_mass, label='Total mass', color='red', linestyle='--')
 
-ax[0].set_xlabel('Battery ratio (Fraction Source 1)')
-ax[0].set_ylabel('Mass')
-ax[0].set_title('Energy and power requirements vs battery ratio')
+ax[0].set_xlabel(f'Fraction of {name1} (vs {name2})')
+ax[0].set_ylabel('Mass (kg)')
+ax[0].set_title(f'Energy & Power Requirements vs Battery Ratio — ({name1} / {name2})')
 
-ax[1].set_xlabel('Battery ratio (Fraction Source 1)')
-ax[1].set_ylabel('Mass')
-ax[1].set_title('Energy and power requirements vs battery ratio')
+ax[1].set_xlabel(f'Fraction of {name1} (vs {name2})')
+ax[1].set_ylabel('Mass (kg)')
+ax[1].set_title(f'Total System Mass vs Battery Ratio —  ({name1} / {name2})')
 
 ax[0].legend()
 ax[1].legend()
@@ -92,5 +98,5 @@ plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.show()
 
-print("Minimum Mass: ", minimum_mass)
-print("Fraction Source 1 for minimum mass: ", minimum_mass_fraction)
+print(f"Minimum Mass: {minimum_mass:.3f} kg")
+print(f"Optimal fraction of {name1}: {minimum_mass_fraction:.2f}  |  {name2}: {1 - minimum_mass_fraction:.2f}")
