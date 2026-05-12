@@ -85,7 +85,9 @@ ax[1].set_xlabel('Battery ratio (Fraction Source 1)')
 ax[1].set_ylabel('Mass')
 ax[1].set_title('Energy and power requirements vs battery ratio')
 
-plt.legend()
+ax[0].legend()
+ax[1].legend()
+
 plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.show()
