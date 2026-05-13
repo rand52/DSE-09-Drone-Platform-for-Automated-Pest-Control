@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 #------------------------------------------------=-----
 
 #flight parameters
-total_flight_time = 200 #s
+total_flight_time = 120 #s
 t_peak = 2 #s time peak power is required
 P_peak = 304 #W
 P_avg = 150 # W
@@ -39,20 +39,13 @@ optimal_ratio_index = np.argmin(difference)
 print(battery_ratio_list[optimal_ratio_index])
 print(m_maxpower_req_list[optimal_ratio_index]) # weight due to energy and power constraint approximately the same
 
-fig,ax = plt.subplots(2,1,figsize=(9,5))
+plt.figure(figsize=(9, 5))
+plt.plot(battery_ratio_list, m_energy_req_list, label='Energy requirement', color='blue', linewidth=2)
+plt.plot(battery_ratio_list, m_maxpower_req_list, label='Power requirement', color='orange', linewidth=2, linestyle='--')
 
-ax[0].plot(battery_ratio_list, m_energy_req_list, label='Energy requirement', color='blue', linewidth=2)
-ax[0].plot(battery_ratio_list, m_maxpower_req_list, label='Power requirement', color='orange', linewidth=2)
-ax[1].plot(battery_ratio_list,np.maximum(m_energy_req_list,m_maxpower_req_list),label='Minimum weight',color='red',linestyle='--')
-
-ax[0].set_xlabel('Battery ratio (Li-ion fraction)')
-ax[0].set_ylabel('Mass Li-ion Lipo battery')
-ax[0].set_title('Energy and power requirements vs battery ratio (t=200s)')
-
-ax[1].set_xlabel('Battery ratio (Li-ion fraction)')
-ax[1].set_ylabel('Mass Li-ion Lipo battery')
-ax[1].set_title('Energy and power requirements vs battery ratio (t=200s)')
-
+plt.xlabel('Battery ratio (Li-ion fraction)')
+plt.ylabel('Mass Li-ion Lipo battery')
+plt.title('Energy and power requirements vs battery ratio (t=200s)')
 plt.legend()
 plt.grid(True, alpha=0.3)
 plt.tight_layout()
