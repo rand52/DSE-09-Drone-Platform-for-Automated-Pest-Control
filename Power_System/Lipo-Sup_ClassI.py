@@ -1,20 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import Comparison_Params as cp
 #flight parameters
-total_flight_time = 15 #s
-t_peak = 2 #s time peak power is required
-P_peak = 304 #W
-P_avg = 150 # W
+total_flight_time = cp.total_flight_time_short #s
+t_peak = cp.t_peak #s time peak power is required
+P_peak = cp.P_peak_ClassI #W
+P_avg = cp.avg_to_peak_ratio * P_peak # W
 
 #battery and capcitor parameters
-P_density_Lipo = 8332.178571 # W/kg # 11304.91111 for 60-80 gram
-E_density_Lipo = 145.0428571 # Wh/kg 156.547772 for 60-80 gram
+P_density_Lipo = cp.P_density_lipo_classI # W/kg # 11304.91111 for 60-80 gram
+E_density_Lipo = cp.E_density_lipo_classI # Wh/kg 156.547772 for 60-80 gram
 
-P_density_Li_ion = 242 #W/kg #3024 for 60-80gram
-E_density_Li_ion = 140 # Wh/kg # 245 for 60-80gram
-
-P_density_supercap = 9300 # W/kg
-E_density_supercap = 3.2 # Wh/kg
+P_density_supercap = cp.P_density_supercap_classI # W/kg
+E_density_supercap = cp.E_density_supercap_classI # Wh/kg
 
 
 E_total = P_avg * (total_flight_time/3600)
