@@ -21,7 +21,7 @@ combination = np.array([[
 
 # Input for class
 
-clas = int(input("Select 1 for classI and 2 for Class2"))
+clas = int(input("Select 1 for ClassI and 2 for Class2"))
 
 # Extracting P_peak and Getting P_avg
 
