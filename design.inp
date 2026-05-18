@@ -11,8 +11,8 @@ MyProp_v1
  0.0 0.5 1.0 ! XIdes
  0.0 0.5 0.4 ! CLdes
 
- 0.00375 ! hub radius
- 0.0375 ! tip radius
+ 0.0044 ! hub radius
+ 0.044 ! tip radius
  5 ! speed
  30000.0 ! rpm
 
