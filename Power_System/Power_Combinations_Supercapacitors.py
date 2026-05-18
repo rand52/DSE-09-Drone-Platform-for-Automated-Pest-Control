@@ -1,6 +1,9 @@
 import numpy as np
+import scienceplots
 import matplotlib.pyplot as plt
 import Comparison_Params as cp
+
+plt.style.use(['science', 'no-latex', 'grid'])
 
 # General Flight parameters
 

@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import Comparison_Params as cp
+import scienceplots
+
+plt.style.use(['science', 'no-latex', 'grid'])
 
 # General Flight parameters
 
@@ -79,17 +82,17 @@ name2 = source_names[comb2]
 
 fig,ax = plt.subplots(2,1,figsize=(9,5))
 
-ax[0].plot(percentage_first_source, m_energy_requirement, label='Energy requirement', color='blue', linewidth=2)
-ax[0].plot(percentage_first_source, m_power_requirement, label='Power requirement', color='orange', linewidth=2)
-ax[1].plot(percentage_first_source, total_mass, label='Total mass', color='red', linestyle='--')
+ax[0].plot(percentage_first_source, m_energy_requirement, label='Energy requirement', color='Steelblue', linewidth=2)
+ax[0].plot(percentage_first_source, m_power_requirement, label='Power requirement', color='Tomato', linewidth=2)
+ax[1].plot(percentage_first_source, total_mass, label='Total mass', color='Darkorange', linestyle='--')
 
 ax[0].set_xlabel(f'Fraction of {name1} (vs {name2})')
 ax[0].set_ylabel('Mass (kg)')
-ax[0].set_title(f'Energy & Power Requirements vs Battery Ratio — ({name1} / {name2})')
+#ax[0].set_title(f'Energy & Power Requirements vs Battery Ratio — ({name1} / {name2})')
 
 ax[1].set_xlabel(f'Fraction of {name1} (vs {name2})')
 ax[1].set_ylabel('Mass (kg)')
-ax[1].set_title(f'Total System Mass vs Battery Ratio —  ({name1} / {name2})')
+#ax[1].set_title(f'Total System Mass vs Battery Ratio —  ({name1} / {name2})')
 
 ax[0].legend()
 ax[1].legend()
