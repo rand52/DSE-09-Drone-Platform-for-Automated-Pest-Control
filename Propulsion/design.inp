@@ -1,4 +1,4 @@
-MyProp_v1
+Propeller
 
  3 ! Nblades
 
@@ -11,12 +11,12 @@ MyProp_v1
  0.0 0.5 1.0 ! XIdes
  0.0 0.5 0.4 ! CLdes
 
- 0.0044 ! hub radius
+ 0.004522916666666666 ! hub radius
  0.044 ! tip radius
- 5 ! speed
- 30000.0 ! rpm
+ 5.0 ! speed
+ 30000 ! rpm
 
- 5 ! Thrust
+ 2.081242542483012 ! Thrust
  0 ! Power
 
  0 0 ! Ldes KQdes
