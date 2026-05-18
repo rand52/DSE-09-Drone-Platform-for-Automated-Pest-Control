@@ -89,10 +89,10 @@ if __name__ == "__main__":
     design = QMILInterface("MyProp_v1")
     
     motor = QPROPInterface("Speed-400")
-    motor.params = [0.141, 0.62,2800] # Resistance, Io, Kv
+    motor.params = [0.221, 0.38,1700] # Resistance, Io, Kv
     
     # Run the simulation
-    output = run_software(design, motor, vel="-5,5/2", rpm="30000", volt=0)
+    output = run_software(design, motor, vel="0,5/4", rpm="20000,30000/8", volt=0)
     
     print("\nQPROP Output Results:")
     print(output)
