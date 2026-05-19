@@ -15,8 +15,8 @@ chi = np.radians(20)     # [rad]
 l = 120 / 1000           # [m]
 
 # Discretization
-disc_x = 25            # mesh point in x direction
-disc_z = 25            # mesh point in y direction
+disc_x = 30            # mesh point in x direction
+disc_z = 30            # mesh point in y direction
 
 # Drone arm definition
 L = 150 / 1000          # [m]
@@ -119,8 +119,8 @@ def plot_stresses(l):
     sigma_yy = sigma_axial + sigma_bending_on_x + sigma_bending_on_y
 
     # Shear stresses
-    tau_yx = (2 * loads["Fz"] / geometry["Ixx"]) * (geometry["t"]**2 / 4 - Z**2)
-    tau_yz = (2 * loads["Fx"] / geometry["Izz"]) * (geometry["w"]**2 / 4 - X**2)
+    tau_yz = (loads["Fz"] / geometry["Ixx"]) * (1/2) * (geometry["t"]**2 / 4 - Z**2)
+    tau_yx = (loads["Fx"] / geometry["Izz"]) * (1/2) * (geometry["w"]**2 / 4 - X**2)
 
     # von Misses stress
     sigma_misses = np.sqrt(sigma_yy**2 + 3*tau_yx**2 + 3*tau_yz**2)
@@ -151,7 +151,7 @@ def plot_stresses(l):
     ax1.set_title(f'Normal_yy at l={l * 1000} mm')
 
     # Plot the von Misses stress
-    color_bar_2_ref = ax2.imshow(tau_yx / 1e6, cmap='bwr_r',
+    color_bar_2_ref = ax2.imshow(sigma_misses / 1e6, cmap='bwr_r',
                                  vmin=-np.abs(sigma_misses_max / 1e6), vmax=np.abs(sigma_misses_max / 1e6),
                                  extent=[-w / 2 * 1000, w / 2 * 1000, -t / 2 * 1000, t / 2 * 1000],
                                  origin='lower', aspect='equal')

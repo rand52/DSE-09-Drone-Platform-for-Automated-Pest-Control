@@ -125,8 +125,8 @@ def find_max_stress(l):
             sigma_yy = sigma_axial + sigma_bending_on_x + sigma_bending_on_z
 
             # Shear stresses
-            tau_yx = (2 * loads["Fz"] / geometry["Ixx"]) * (geometry["t"]**2 / 4 - Z**2)
-            tau_yz = (2 * loads["Fx"] / geometry["Izz"]) * (geometry["w"]**2 / 4 - X**2)
+            tau_yz = (loads["Fz"] / geometry["Ixx"]) * (1 / 2) * (geometry["t"] ** 2 / 4 - Z ** 2)
+            tau_yx = (loads["Fx"] / geometry["Izz"]) * (1 / 2) * (geometry["w"] ** 2 / 4 - X ** 2)
 
             # von Misses stress
             sigma_misses = np.sqrt(sigma_yy**2 + 3*tau_yx**2+ 3*tau_yz**2)
