@@ -5,18 +5,18 @@ import matplotlib.pyplot as plt
 E = 70e9                # [Pa] Young's modulus of aluminum
 sigma_yield = 200e6     # [Pa] yield strength of aluminum
 
-# Drone definition
-L = 200 / 1000          # [m]
-phi = 60                # [deg]
+# Drone arm definition
+L = 140 / 1000          # [m]
+phi = 90                # [deg]
 
-t = 50 / 1000            # [m] arm height in y-direction
-w = 20 / 1000           # [m] arm width in x-direction
-a = 200 / 1000          # [m] drone box side a
-b = 150 / 1000          # [m] drone box side b
+t = 4.4 / 1000           # [m] arm height in y-direction
+w = 16 / 1000           # [m] arm width in x-direction
+# a = 200 / 1000          # [m] drone box side a
+# b = 150 / 1000          # [m] drone box side b
 
 # Force definition
 F = -100                # [N]
-l = 50 / 1000           # [m]
+l = 140 / 1000           # [m]
 
 # Discretization
 disc_x = 50            # mesh point in x direction
@@ -108,12 +108,12 @@ def find_max_stress(l):
     # All available impact angles for this phi
     chi_arr = np.radians(np.arange(-90, 90))
     psi_arr = np.radians(np.arange(np.round(-90-phi/2), np.round(180-phi/2)))
-    print(np.degrees(chi_arr[0]),np.degrees(chi_arr[-1]))
-    print(np.degrees(psi_arr[0]),np.degrees(psi_arr[-1]))
+    # print(np.degrees(chi_arr[0]),np.degrees(chi_arr[-1]))
+    # print(np.degrees(psi_arr[0]),np.degrees(psi_arr[-1]))
+
 
     for chi in chi_arr:
         for psi in psi_arr:
-            print(chi, psi)
             loads = internal_loads(l=l, F=F, psi=psi, chi=chi)
 
             # Normal stress superposition
@@ -140,8 +140,6 @@ def find_max_stress(l):
                 max_global_sigma_misses = sigma_misses
                 psi_global_max_stress = psi
                 chi_global_max_stress = chi
-                Fx_max = loads["Fx"]
-                Fy_max = loads["Fy"]
 
     print(f'Max normal stress of, {np.round(max_global_stress_von_misses / 1e6, 2)}, MPa, at psi = {np.round(np.degrees(psi_global_max_stress), 2)} deg, chi = {np.round(np.degrees(chi_global_max_stress), 2)} deg,')
 
@@ -169,11 +167,10 @@ def find_max_stress(l):
     fig.colorbar(color_bar_2_ref, label='Stress [MPa]', ax=ax2)
     ax2.set_xlabel('x [mm]')
     ax2.set_ylabel('z [mm]')
-    ax2.set_title(f'von Misses stress at l={l * 1000} mm')
+    ax2.set_title(f'von Misses stress at l={l * 1000} mm for ')
     ax2.axis('equal')
 
     plt.show()
 
 
-l = 50 / 1000      # [m] from tip of arm
 find_max_stress(l)

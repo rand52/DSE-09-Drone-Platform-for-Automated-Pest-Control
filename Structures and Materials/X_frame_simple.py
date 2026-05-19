@@ -1,4 +1,5 @@
 import numpy as np
+import mplcursors
 import matplotlib.pyplot as plt
 
 # Material properties
@@ -6,18 +7,25 @@ E = 70e9                # [Pa] Young's modulus of aluminum
 sigma_yield = 200e6     # [Pa] yield strength of aluminum
 
 # Force definition
-F = 100                 # [N]
-psi = np.radians(0)    # [rad]
-chi = np.radians(90)     # [rad]
+F = 10                 # [N]
+psi = np.radians(60)    # [rad]
+chi = np.radians(20)     # [rad]
+
+# Cross-section distance # [m]
+l = 120 / 1000           # [m]
 
 # Discretization
-disc_x = 100            # mesh point in x direction
-disc_z = 100            # mesh point in y direction
+disc_x = 25            # mesh point in x direction
+disc_z = 25            # mesh point in y direction
 
-t = 5 / 1000            # [m] arm height in y-direction
-w = 20 / 1000           # [m] arm width in x-direction
-a = 200 / 1000          # [m] drone box side a
-b = 150 / 1000          # [m] drone box side b
+# Drone arm definition
+L = 150 / 1000          # [m]
+phi = 90                # [deg]
+
+t = 10 / 1000            # [m] arm height in y-direction
+w = 30 / 1000           # [m] arm width in x-direction
+# a = 200 / 1000          # [m] drone box side a
+# b = 150 / 1000          # [m] drone box side b
 
 
 def drone_geometry(t, w, a = None, b= None, L=None, phi = None):
@@ -50,7 +58,7 @@ def drone_geometry(t, w, a = None, b= None, L=None, phi = None):
         "Izz": Izz      # [m^4] moment of area about beam z-axis
     }
 
-geometry = drone_geometry(t=t,w=w,a=a,b=b)
+geometry = drone_geometry(t=t,w=w,L=L,phi=phi)
 #print(geometry)
 
 def internal_loads(l):
@@ -65,6 +73,7 @@ def internal_loads(l):
     Mx = - Fz * l   # negative sign, coz Mx + Fz*l =0
     Mz = - Fx * l   # negative sign, coz Mz + Fx*l =0
     #print(Fz,Fx,Fy,Mx,Mz)
+    print("Fx", Fx, " Fy", Fy, " Fz", Fz)
 
     return {
         "l": l,         # [m] distance from arm tip
@@ -103,7 +112,7 @@ def plot_stresses(l):
     #      [1,0,-1]]        [-a,0,a]]
 
     # Normal stress superposition
-    # sigma= Fz/A + Mx*z/Ixx + Mz*x/Izz
+    # sigma= Fy/A + Mx*z/Ixx + Mz*x/Izz
     sigma_axial = loads["Fy"] / A
     sigma_bending_on_x = loads["Mx"] * Z / geometry["Ixx"]
     sigma_bending_on_y = loads["Mz"] * X / geometry["Izz"]
@@ -125,8 +134,10 @@ def plot_stresses(l):
 
     # Plot the normal stresses
     # cmap='bwr_r' gives +=blue (tension) and -=red (compression)
-    color_bar_1_ref = ax1.pcolormesh(X * 1000, Z * 1000, sigma_yy / 1e6, cmap='bwr_r', vmin=-np.abs(sigma_normal_max / 1e6), vmax=np.abs(sigma_normal_max / 1e6))
-
+    color_bar_1_ref = ax1.imshow(sigma_yy / 1e6, cmap='bwr_r',
+                                 vmin=-np.abs(sigma_normal_max / 1e6), vmax=np.abs(sigma_normal_max / 1e6),
+                                 extent=[-w / 2 * 1000, w / 2 * 1000, -t / 2 * 1000, t / 2 * 1000],
+                                 origin='lower', aspect='equal')
     # Invert x-axis to be consistent with our coord definition
     ax1.invert_xaxis()
 
@@ -138,10 +149,12 @@ def plot_stresses(l):
     ax1.set_xlabel('x [mm]')
     ax1.set_ylabel('z [mm]')
     ax1.set_title(f'Normal_yy at l={l * 1000} mm')
-    ax1.axis('equal')
 
     # Plot the von Misses stress
-    color_bar_2_ref = ax2.pcolormesh(X * 1000, Z * 1000, sigma_misses / 1e6, cmap='bwr_r', vmin=-np.abs(sigma_misses_max / 1e6), vmax=np.abs(sigma_misses_max / 1e6))
+    color_bar_2_ref = ax2.imshow(tau_yx / 1e6, cmap='bwr_r',
+                                 vmin=-np.abs(sigma_misses_max / 1e6), vmax=np.abs(sigma_misses_max / 1e6),
+                                 extent=[-w / 2 * 1000, w / 2 * 1000, -t / 2 * 1000, t / 2 * 1000],
+                                 origin='lower', aspect='equal')
     ax2.invert_xaxis()
     # Add the max stress
     ax2.text(10, 12, f'stress_von_Misses_max = {np.round(sigma_misses_max / 1e6, 2)} MPa', fontsize=10)
@@ -149,11 +162,10 @@ def plot_stresses(l):
     ax2.set_xlabel('x [mm]')
     ax2.set_ylabel('z [mm]')
     ax2.set_title(f'von Misses stress at l={l * 1000} mm')
-    ax2.axis('equal')
 
+    # Makes it so you can hover with the mouse to see the stresses
+    mplcursors.cursor([color_bar_1_ref, color_bar_2_ref], hover=True)
     plt.show()
 
 
-
-l = 50 / 1000      # [m] from tip of arm
 plot_stresses(l)
