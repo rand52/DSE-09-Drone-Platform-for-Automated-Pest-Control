@@ -43,7 +43,7 @@ def LiPo_sim (P_max=320,P_avg=128,t_flight=10):
     ''' LiPo Parameter Calculations '''
 
         # Loading Data
-    battery_csv_path = r"C:\Users\spash\OneDrive\Desktop\Uni\Bachelor\Year 3\DSE\DSE Code\DSE-09-Drone-Platform-for-Automated-Pest-Control\Power_System\CSV files\0_Discharge_std.csv"
+    battery_csv_path = r"C:\Users\spash\OneDrive\Desktop\Uni\Bachelor\Year 3\DSE\DSE Code\DSE-09-Drone-Platform-for-Automated-Pest-Control\Power_System\CSV files\0_Discharge_std_3.csv"
     battery_data = np.loadtxt(battery_csv_path, delimiter="\t")
     extracted_charge_linreg = battery_data[:,0]
     voltage_linreg = battery_data[:,1]
@@ -53,7 +53,7 @@ def LiPo_sim (P_max=320,P_avg=128,t_flight=10):
     state_of_charge_linreg = (capacity_linreg - extracted_charge_linreg) / capacity_linreg # State of charge vector as franction a.k.a % / 100
 
         # Model fitting
-    polyfit = PolynomialFeatures(degree=9)
+    polyfit = PolynomialFeatures(degree = 8)
     train_soc = polyfit.fit_transform(state_of_charge_linreg.reshape(-1,1))
     voltage_curve_model = LinearRegression()
     voltage_curve_model.fit(train_soc,voltage_linreg)
@@ -122,7 +122,9 @@ def LiPo_sim (P_max=320,P_avg=128,t_flight=10):
 
     ax[0,0].plot(t, C_rate_vec, color='Steelblue', linewidth=2)
     ax[0,1].plot(t, soc_vec*100, color='Steelblue', linewidth=2)
-    ax[1,0].plot(t, V_vec, color='Steelblue', linewidth=2)
+    ax[1,0].plot(t, V_vec/4, color='Tomato', linewidth=2, label = 'Voltage Per Cell')
+    ax[1,0].plot(t, V_vec, color='Steelblue', linewidth=2, label = 'Total Voltage')
+    ax[1,0].plot(t, np.full_like(t, 2.75), color='red', linewidth=1, label = 'Cutoff Voltage', linestyle = '--')
     ax[1,1].plot(t, I_vec, color='Steelblue', linewidth=2)
 
     ax[0,0].set_xlabel('Time(s)')
@@ -136,6 +138,8 @@ def LiPo_sim (P_max=320,P_avg=128,t_flight=10):
 
     ax[1,1].set_xlabel('Time(s)')
     ax[1,1].set_ylabel('Current(A)')
+
+    ax[1,0].legend()
 
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
