@@ -10,13 +10,13 @@ def euler_to_quat(phi, theta, psi):
     s_theta = np.sin(theta)
     c_psi = np.cos(psi)
     s_psi = np.sin(psi)
-    R = [[c_theta*c_psi, c_theta*s_psi, -s_theta],
+    H = [[c_theta*c_psi, c_theta*s_psi, -s_theta],
          [(s_phi*s_theta*c_psi)-(c_phi*s_psi), (s_phi*s_theta*s_psi)+(c_phi*c_psi), s_phi*c_theta],
          [(c_phi*s_theta*c_psi)+(s_phi*s_psi), (c_phi*s_theta*s_psi)-(s_phi*c_psi), c_phi*c_theta]]
-    r = R.from_matrix(R)
-    print(R.as_quat())
+    h = R.from_matrix(H)
+    print(h.as_quat())
 
-    return R.as_quat()
+    return h.as_quat()
 
 R = euler_to_quat(1, 1, 1)
 
