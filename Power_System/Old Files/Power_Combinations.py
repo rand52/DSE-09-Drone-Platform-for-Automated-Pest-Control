@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import Comparison_Params as cp
+import LiPo_sim.Comparison_Params as cp
 import scienceplots
 
 plt.style.use(['science', 'no-latex', 'grid'])

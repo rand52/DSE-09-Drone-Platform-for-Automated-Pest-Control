@@ -72,7 +72,7 @@ ax.legend()
 ax.set_xticks(list(degrees))
 plt.tight_layout()
 plt.show()
-
+'''
 # ── Plot 2: Best-fit curve overlaid on data ───────────────────────────────────
 best_poly, best_model = models[best_degree]
 
@@ -90,5 +90,5 @@ ax.set_ylabel("Voltage (V)")
 ax.set_title(f"OCV–SoC Model — Degree {best_degree} Polynomial")
 ax.legend()
 plt.tight_layout()
-plt.savefig("best_fit_curve.pdf")
 plt.show()
+'''

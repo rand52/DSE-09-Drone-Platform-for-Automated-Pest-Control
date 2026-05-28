@@ -1,20 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import Comparison_Params as cp
 import scienceplots
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.metrics import root_mean_squared_error
+from Final_Model_Fit_Discharge import voltage_curve_model, polyfit
 
 plt.style.use(['science', 'no-latex', 'grid'])
 
 def LiPo_sim (P_max=320,P_avg=128,t_flight=10):
 
-    ''' Battery Parameters '''
+    '''------------Battery Parameters----------------'''
 
     R_i = 0.03 # Internal resistance of battery [Ohms]
     num_cells = 4 # Number of cells in the batetry
-    battery_capacity_Ah = 0.5 # Assumed capacity of battery [Ah]
+    nominal_battery_capacity_Ah = 0.5 # Assumed capacity of battery [Ah]
+    avg_DoD = 0.3 # Average DoD that the battery will have as a fraction
+    cycle_number = 200 # Number of cycles the battery has gone through
 
     t_p_max = 4 # Time at max power [s]
     t_t_p_max_frac = 0 # Temporal location of the start of peak power as % of total fight
@@ -22,43 +24,33 @@ def LiPo_sim (P_max=320,P_avg=128,t_flight=10):
     initial_charge_soc = 0.65 # SOC to which we maximum charge
     charging_rate = 2 # C-Rate for charging
 
-    ''' Additional Time calculations/parameters '''
+    '''---------------Additional Time calculations/parameters-------------------'''
 
         # Params
-    dt = 0.0005  # Timestep size [s]
+    dt = 0.001  # Timestep size [s]
 
         # Calculations
     t = np.arange(0,t_flight+dt,dt) # Time vector 
     t_start_max_power = t_t_p_max_frac * t_flight # Temporal location of max power
     t_max_power = np.arange(t_start_max_power, t_start_max_power + t_p_max + dt, dt) # Time Vector of Max Power
 
-    ''' Power and Battery Parameters and Calculations '''
-
+    '''-------------Power and Battery Parameters and Calculations----------------'''
         # Calculations
     P_max = P_max / 0.8 # Assuming that propellers draw 80% of the power 
     P_avg = P_avg / 0.8 # Assuming that propellers draw 80% of the power
-    battery_capacity = battery_capacity_Ah * 3600 # Battery Capacity in Amp_secs for calculation
+    cycle_number_actual = cycle_number * avg_DoD # Equivalent actual full cycles the battery has gone through
+
+            # Degradation Model
+    degradation_frac = 1.085 - 0.07961 * np.exp(0.00563*cycle_number_actual)
+    battery_capacity = nominal_battery_capacity_Ah * degradation_frac * 3600 # Battery Capacity in Amp_secs for calculation
+    battery_capacity_Ah = battery_capacity / 3600
     initial_charge = battery_capacity * initial_charge_soc
 
-    ''' LiPo Parameter Calculations '''
+    '''-------------LiPo Parameter Calculations---------------------'''
 
-        # Loading Data
-    battery_csv_path = r"C:\Users\spash\OneDrive\Desktop\Uni\Bachelor\Year 3\DSE\DSE Code\DSE-09-Drone-Platform-for-Automated-Pest-Control\Power_System\CSV files\0_Discharge_std_3.csv"
-    battery_data = np.loadtxt(battery_csv_path, delimiter="\t")
-    extracted_charge_linreg = battery_data[:,0]
-    voltage_linreg = battery_data[:,1]
-    capacity_linreg = extracted_charge_linreg[-1] #C apacity of tested battery at current cycle, used only to derive mathematical model [Ah]
 
-        # Calculations
-    state_of_charge_linreg = (capacity_linreg - extracted_charge_linreg) / capacity_linreg # State of charge vector as franction a.k.a % / 100
 
-        # Model fitting
-    polyfit = PolynomialFeatures(degree = 8)
-    train_soc = polyfit.fit_transform(state_of_charge_linreg.reshape(-1,1))
-    voltage_curve_model = LinearRegression()
-    voltage_curve_model.fit(train_soc,voltage_linreg)
-
-    '''Battery Performance Calculations'''
+    '''--------------Battery Performance Calculations------------------'''
 
     used_charge = 0 # Initialise used charge for calculation [As]
     P_actual = P_avg # Initialise P_actual delivered [W]
@@ -74,10 +66,10 @@ def LiPo_sim (P_max=320,P_avg=128,t_flight=10):
         battery_soc = (initial_charge - used_charge) / battery_capacity
         Vocv_per_cell = voltage_curve_model.predict(polyfit.transform([[battery_soc]]))[0]
 
-        tau_up = 0.2   # spool up faster
+        tau_up = 0.1   # spool up faster
         tau_down = 0.6 # spool down slower
 
-        t_ramp = 0.1
+        t_ramp = 0.05
 
         def smoothstep(x):
             return 1 / (1 + np.exp(-x))
@@ -113,11 +105,13 @@ def LiPo_sim (P_max=320,P_avg=128,t_flight=10):
         V_vec[idx] = V_delivered
         I_vec[idx] = I_drawn
 
-    
-    recharge_time = (initial_charge_soc - soc_vec[-1]) * 3600 / charging_rate
+    DoD = initial_charge_soc - soc_vec[-1]
+    recharge_time = (DoD) * 3600 / charging_rate
     minutes_recharge = int(recharge_time // 60)
     seconds_recharge = int(recharge_time % 60)
-    
+
+    '''---------------Plotting------------------'''
+
     fig,ax = plt.subplots(2,2,figsize=(9,5))
 
     ax[0,0].plot(t, C_rate_vec, color='Steelblue', linewidth=2)
@@ -147,7 +141,10 @@ def LiPo_sim (P_max=320,P_avg=128,t_flight=10):
 
     print("Recharge Time: ",f"{minutes_recharge} min {seconds_recharge} s")
 
-LiPo_sim()
+'''---------------Running Simulation------------------'''
+
+if __name__ == "__main__":
+    LiPo_sim()
 
    
 
