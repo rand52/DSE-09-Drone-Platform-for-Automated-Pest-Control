@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import LiPo_sim.Comparison_Params as cp
+import Comparison_Params as cp
 import scienceplots
 
 plt.style.use(['science', 'no-latex', 'grid'])
@@ -82,16 +82,17 @@ name2 = source_names[comb2]
 
 fig,ax = plt.subplots(2,1,figsize=(9,5))
 
-ax[0].plot(percentage_first_source, m_energy_requirement, label='Energy requirement', color='Steelblue', linewidth=2)
-ax[0].plot(percentage_first_source, m_power_requirement, label='Power requirement', color='Tomato', linewidth=2)
-ax[1].plot(percentage_first_source, total_mass, label='Total mass', color='Darkorange', linestyle='--')
+ax[0].plot(percentage_first_source, m_energy_requirement*1000, label='Energy requirement', color='Steelblue', linewidth=2)
+ax[0].plot(percentage_first_source, m_power_requirement*1000, label='Power requirement', color='Tomato', linewidth=2)
+ax[1].plot(percentage_first_source, total_mass*1000, label='Total mass', color='Darkorange', linestyle='--')
 
-ax[0].set_xlabel(f'Fraction of {name1} (vs {name2})')
-ax[0].set_ylabel('Mass (kg)')
+ax[0].set_xlabel(f'Fraction of {name1} (vs {name2})',fontsize=16)
+ax[0].set_ylabel('Mass (g)',fontsize=16)
 #ax[0].set_title(f'Energy & Power Requirements vs Battery Ratio — ({name1} / {name2})')
 
-ax[1].set_xlabel(f'Fraction of {name1} (vs {name2})')
-ax[1].set_ylabel('Mass (kg)')
+ax[1].set_xlabel(f'Fraction of {name1} (vs {name2})',fontsize=16)
+ax[1].set_ylabel('Mass (g)',fontsize=16)
+ax[1].set_ylim(ymin=0, ymax=270)
 #ax[1].set_title(f'Total System Mass vs Battery Ratio —  ({name1} / {name2})')
 
 ax[0].legend()

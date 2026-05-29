@@ -21,3 +21,6 @@ polyfit = PolynomialFeatures(degree = 4)
 train_soc = polyfit.fit_transform(state_of_charge_linreg.reshape(-1,1))
 voltage_curve_model = LinearRegression()
 voltage_curve_model.fit(train_soc,voltage_linreg)
+intercept = voltage_curve_model.intercept_
+coef = voltage_curve_model.coef_
+

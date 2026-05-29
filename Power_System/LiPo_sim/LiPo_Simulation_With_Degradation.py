@@ -4,9 +4,25 @@ import scienceplots
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.metrics import root_mean_squared_error
-from Final_Model_Fit_Discharge import voltage_curve_model,polyfit
+from Final_Model_Fit_Discharge import intercept,coef
 
 plt.style.use(['science', 'no-latex', 'grid'])
+
+def smoothstep(x):
+        return 1 / (1 + np.exp(-x))
+
+def Vocv_poly(x):
+    x2 = x*x
+    x3 = x2*x
+    x4 = x3*x
+
+    return (
+        intercept
+        + coef[1]*x
+        + coef[2]*x2
+        + coef[3]*x3
+        + coef[4]*x4
+    )
 
 def LiPo_sim (P_max_mot=320,P_avg_mot=128,t_flight=10):
 
@@ -35,6 +51,9 @@ def LiPo_sim (P_max_mot=320,P_avg_mot=128,t_flight=10):
 
             # Params
         dt = 0.01  # Timestep size [s]
+        tau_up = 0.1   # spool up faster, how fast motors spool up
+        tau_down = 0.6 # spool down slower, how fast motors spool down
+        t_ramp = 0.05 # How fast demanded power raises
 
             # Calculations
         t = np.arange(0,t_flight+dt,dt) # Time vector 
@@ -53,9 +72,6 @@ def LiPo_sim (P_max_mot=320,P_avg_mot=128,t_flight=10):
         battery_capacity_Ah = battery_capacity / 3600
         initial_charge = battery_capacity * initial_charge_soc
 
-        '''-------------LiPo Parameter Calculations---------------------'''
-
-
         '''--------------Battery Performance Calculations------------------'''
 
         used_charge = 0 # Initialise used charge for calculation [As]
@@ -70,15 +86,9 @@ def LiPo_sim (P_max_mot=320,P_avg_mot=128,t_flight=10):
         for idx, time in enumerate(t):
 
             battery_soc = (initial_charge - used_charge) / battery_capacity
-            Vocv_per_cell = voltage_curve_model.predict(polyfit.transform([[battery_soc]]))[0]
 
-            tau_up = 0.1   # spool up faster
-            tau_down = 0.6 # spool down slower
-
-            t_ramp = 0.05
-
-            def smoothstep(x):
-                return 1 / (1 + np.exp(-x))
+            #Vocv_per_cell = voltage_curve_model.predict(polyfit.transform([[battery_soc]]))[0]
+            Vocv_per_cell = Vocv_poly(battery_soc)
 
             transition = smoothstep((time - t_max_power[0]) / t_ramp) - smoothstep((time - t_max_power[-1]) / t_ramp)
 
