@@ -139,7 +139,7 @@ def LiPo_sim (P_max=320,P_avg=128,t_flight=10):
     plt.tight_layout()
     plt.show()
 
-    print("Recharge Time: ",f"{minutes_recharge} min {seconds_recharge} s")
+    print("Recharge Time at 2C: ",f"{minutes_recharge} min {seconds_recharge} s")
 
 '''---------------Running Simulation------------------'''
 
