@@ -14,6 +14,7 @@ class MothTrajectory:
     CHANGELOG BELOW:
     CHANGE 1: First iteration for the code made
     CHANGE 2: Pandas used for faster file loading
+    CHANGE 3: Max can you see this
     """
     def __init__(self, path: str, require_valid: bool = True, smoothed: bool = True ) -> None:
         # Check whether smoothed is used 
