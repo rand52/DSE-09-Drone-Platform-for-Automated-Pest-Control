@@ -48,4 +48,26 @@ class MothTrajectory:
         self.start_pos = self.pos[0].copy()
         self.end_pos = self.pos[-1].copy()
 
-        
+    def position(self, t: float) ->np.ndarray:
+        """
+        Moth position will be interpolated between time intervals, 
+        tc makes sure time can continue outside if mujoco continues for longer
+        Prevents framerate mismatch
+        """
+        tc= float(np.clip(t, 0.0, self.duration))
+        return np.array([np.interp(tc, self.t, self.pos[:,k]) for k in range(3)])
+
+    def velocity(self, t: float) ->np.ndarray:
+        """
+        Same goes for the velocity
+        """
+        tc = float(np.clip(t, 0.0, self.duration))
+        return np.array([np.interp(tc, self.t, self.vel[:,k]) for k in range(3)])
+    
+    def __repr__(self) -> str:
+        """ 
+        For debugging purposes, does not really matter, but is nice for prints later
+        Especially when we want to know where our moth is 
+        """
+        return (f"MothTrack({len(self.t)} samples, dur={self.duration:.2f}s, "
+                f"start={np.round(self.start_pos, 2)}, end={np.round(self.end_pos, 2)})")
