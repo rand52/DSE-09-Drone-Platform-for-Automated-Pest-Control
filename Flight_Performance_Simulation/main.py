@@ -1,17 +1,17 @@
 #imports
 import mujoco
 import numpy as np
-from moth import load_moth_track, moth_position
 import mujoco.viewer
 import time
-from controller import run_controller
 from moth import MothTrajectory
 
 from aero import AeroEngine
+from controller import FlightController
+
 
 
 #Loading drone model and moth path
-Model_path = "Flight_Performance_Simulation\chameleon.xml"
+Model_path = r"Flight_Performance_Simulation\chameleon.xml"
 Moth_Log = "log_itrk3.csv"
 
 
@@ -23,9 +23,18 @@ Drone_area = 0.01 #m^2 FIND VALUES
 Drone_Cd = 1.0 #Coefficient of drag FIND VALUES
 Drone_pitch_rate = 30 # degrees/s
 SLACK_MARGIN = 0.03
+Capture_Radius = 0.18 #meter TODO: check if neccesary
+F_brake = 10 # Newtons
+BRAKE_RAMP = 0.1 #seconds
+Spool_pos = [0,0,0]
+C_TAUT = 0.0  # FIX 1: was undefined — tether damping coefficient, set to 0 as placeholder TODO: tune value
 
+#Reel in settings
+REEL_SPEED     = 3.0        # reel-in target speed [m/s]
+REEL_KP        = 6.0        # reel velocity-servo gain [N/(m/s)]
+REEL_FORCE_MAX = 25.0       # max reel pull force [N]
+REEL_HOME      = 0.30
 
-capture_radius = 0.18 #meter TODO: check if neccesary
 
 INTERCEPT, BRAKE, REEL = 0, 1, 2
 STATE_NAMES = {INTERCEPT: "INTERCEPT", BRAKE: "BRAKE", REEL: "REEL"}
@@ -50,55 +59,126 @@ def main():
     k_spring    = abs(float(model.tendon_solref_lim[tid][0]))
     model.tendon_stiffness[tid] = k_spring
     aero = AeroEngine(model, data, body_name="drone", Cd=Drone_Cd, area=Drone_area)
+    ctrl = FlightController(model, data, body_name="drone",
+                            max_thrust=Max_Thrust, mass=Drone_Mass, gravity=9.81)
 
-
-    data.mocap_pos[moth_mid] = moth.start_pos #Place moth at start 
-    mujoco.mj_forward(model, data) #calculates all kinematics TODO Check if neccearry 
+    data.mocap_pos[moth_mid] = moth.start_pos #Place moth at start
+    mujoco.mj_forward(model, data) #calculates all kinematics TODO Check if neccearry
     P0 = float(data.ten_length[tid]) + SLACK_MARGIN
     P  = P0
     model.tendon_lengthspring[tid] = [0.0, P] # models the initial length of the tether
 
     drone_pos0  = data.xpos[bid].copy() #Initial drone position
-    to_moth     = moth.start_pos - drone_pos0 #Vector from drone to moth 
+    to_moth     = moth.start_pos - drone_pos0 #Vector from drone to moth
     to_moth_n   = float(np.linalg.norm(to_moth)) # Length of set vector
     Thrust_dir_0 = to_moth/to_moth_n #Unit vector towards moth and initial vector
-    
+
     #Loop bookkeeping
     state = INTERCEPT
+    t_state_enter = 0.0
 
     def step_logic():
-        nonlocal state, P
+        nonlocal state, P, t_state_enter  # FIX 2: added t_state_enter — was missing, so reassignments inside were silently lost
 
         t = data.time
-        pos = data.xpos[bid].copy
-        vel = aero.body_velocity() #Runs velocity calculations 
+        pos = data.xpos[bid].copy()
+        vel = aero.body_velocity() #Runs velocity calculations
         speed = float(np.linalg.norm(vel)) #length of vel
-        
+
         drag     = aero.compute_drag()
         L        = float(data.ten_length[tid])
         Ldot     = float(data.ten_velocity[tid])
+        moth_p = moth.position(t)
 
         if state == INTERCEPT:
-            target = moth.position(t) #Location of the moth 
-            aim = target - pos #Vector form drone to moth 
+            target = moth.position(t) #Location of the moth
+            aim = target - pos #Vector form drone to moth
             dist = float(np.linalg.norm(aim)) #Distance between drone and moth
 
             target_vector = aim/dist
+            ctrl.rotate_thrust_toward(target_vector, dt)
+            thrust_cmd = Max_Thrust
+            ctrl.release_spool()
+            P = max(P, L + SLACK_MARGIN)
+            hit_floor = pos[2] < -3
+            overshot  = np.linalg.norm(pos) > np.linalg.norm(moth_p) + Capture_Radius
+            if dist < Capture_Radius or hit_floor or overshot:
+                state = BRAKE
+                P = L
+                t_state_enter = t
 
-        if state == BRAKE:
-            
+        elif state == BRAKE:
+            ## Thrust becomes 0
 
+            desired_dir = drone_pos0/np.linalg.norm(drone_pos0) #Vector from spool to drone
+            ctrl.rotate_thrust_toward(np.array(desired_dir), dt)  # FIX 3: dt was inside np.array(), moved outside as separate argument
+            thrust_cmd = 0 #TODO try if thrust reduces the bouncing
+
+            ramp = min((t - t_state_enter) / BRAKE_RAMP, 1.0)
+            ctrl.set_brake_friction(ramp * 5.0)
+            ctrl.set_reel_torque(0.0)
+
+            P_slip = L - (ramp*F_brake) / k_spring
+            P = max(P, P_slip)  # FIX 4: was lowercase p — typo meant P was never updated in BRAKE
+
+            if L > 1e-6:
+                u_away   = (pos - [0,0,0]) / L
+                v_radial = float(np.dot(vel, u_away))
+            else:
+                v_radial = 0.0
+            if v_radial <= 0.0 and (t - t_state_enter) > 0.5 * BRAKE_RAMP:
+                state, t_state_enter = REEL, t
+        else: #Reeling
+            desired_dir = drone_pos0/np.linalg.norm(drone_pos0)
+            ctrl.rotate_thrust_toward(desired_dir, dt)
+            thrust_cmd = 0 #TODO change this to see the difference it makes
+
+            to_dock = Spool_pos - pos #vector from drone to dock
+            dist_dock =  float(np.linalg.norm(to_dock))
+            u_dock    = to_dock / dist_dock if dist_dock > 1e-6 else np.zeros(3)
+            v_along   = float(np.dot(vel, u_dock))
+            vert_frac  = max(abs(to_dock[2]) / dist_dock, 0.15)
+            f_hang     = vert_frac
+            f_servo = float(np.clip(REEL_KP * (REEL_SPEED - v_along), 0.0, 10.0))
+            f_pull = float(np.clip(max(f_hang, f_servo), 0.0, REEL_FORCE_MAX))
+            P = L - f_pull / k_spring
+            ctrl.set_reel_torque(10.0)
+            ctrl.set_brake_friction(0.0)
+            if dist_dock <= REEL_HOME:
+                return False
+
+        P = max(P, 0.02)
+        model.tendon_lengthspring[tid] = [0.0, P]  # FIX 5: was [0,0,P] (3 elements) — tendon_lengthspring takes 2 values [lower, upper]
+
+        stretch = L - P
+        if stretch > 0.0:
+            spring  = k_spring * stretch
+            tension = max(0.0, spring + C_TAUT * Ldot)
+            u       = Spool_pos - data.site_xpos[sid_mount]  # FIX 6: was spool_pos (undefined) — matches global Spool_pos
+            nrm     = np.linalg.norm(u)
+            damp_force = ((tension - spring) / nrm) * u if nrm > 1e-9 else np.zeros(3)
+        else:
+            tension    = 0.0
+            damp_force = np.zeros(3)
+
+
+        thrust_actual = ctrl.apply_drone_wrench(thrust_cmd, drag, attitude_hold=False)
+        data.xfrc_applied[bid, 0:3] += damp_force
+
+    t = 0.0
     with mujoco.viewer.launch_passive(model, data) as viewer:
-        while viewer.is_running() and state != REEL and t < 100.0:
+        while viewer.is_running() and t < 100.0:  # FIX 7: removed state != REEL — loop was exiting immediately when REEL began, so reel-in never ran
             step_start = time.time()
-            step_logic()
+            result = step_logic()  # FIX 8: capture return value so docking (return False) stops the loop
+            if result is False:
+                break
             mujoco.mj_step(model, data)
             t += dt
             viewer.sync()
             elapsed = time.time() - step_start
             time.sleep(max(0, dt - elapsed))
 
-        
+
 
 
 main()
