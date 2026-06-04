@@ -16,7 +16,7 @@ def LiPo_sim (P_max=320,P_avg=128,t_flight=10):
     num_cells = 4 # Number of cells in the batetry
     nominal_battery_capacity_Ah = 0.5 # Assumed capacity of battery [Ah]
     avg_DoD = 0.3 # Average DoD that the battery will have as a fraction
-    cycle_number = 200 # Number of cycles the battery has gone through
+    cycle_number = 0 # Number of cycles the battery has gone through
 
     t_p_max = 4 # Time at max power [s]
     t_t_p_max_frac = 0 # Temporal location of the start of peak power as % of total fight

@@ -26,7 +26,7 @@ def Vocv_poly(x):
     )
 
 @njit
-def LiPo_sim (P_max_mot=320,P_avg_mot=128,t_flight=10):
+def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
 
     max_cycles = 500
 

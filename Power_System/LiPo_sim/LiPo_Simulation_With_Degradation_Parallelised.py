@@ -2,15 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scienceplots
 from Final_Model_Fit_Discharge import intercept,coef
-from numba import njit
+from Final_Model_Fit_Internal_Resistance import intercept_res,coef_res
 import time
 
 plt.style.use(['science', 'no-latex', 'grid'])
  
-
 def smoothstep(x):
         return 1 / (1 + np.exp(-x))
-
 
 def Vocv_poly(x):
     x2 = x*x
@@ -25,24 +23,29 @@ def Vocv_poly(x):
         + coef[4]*x4
     )
 
+def R_eff_poly(x):
+     return intercept_res + coef_res[0] * x
 
-def LiPo_sim (P_max_mot=320,P_avg_mot=128,t_flight=10):
+def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
 
-    '''------------Battery Parameters----------------'''
+    '''------------Battery Parameters To Enter For Each Battery----------------'''
+    Cycle_to_display = 0 # Cycle to display in detail
     number_of_cycles_to_simulate = 500
-    R_i = 0.03 # Internal resistance of battery [Ohms]
+    R_eff_initial = 0.018 # Initial condition for internal resistance
     num_cells = 4 # Number of cells in the batetry
-    nominal_battery_capacity_Ah = 0.5 # Assumed capacity of battery [Ah]
+    nominal_battery_capacity_Ah = 0.32 # Assumed capacity of battery [Ah]
     avg_DoD = 0.3 # Average DoD that the battery will have as a fraction
 
-    t_p_max = 4 # Time at max power [s]
+    t_p_max = 3 # Time at max power [s]
     t_t_p_max_frac = 0 # Temporal location of the start of peak power as % of total fight
 
-    initial_charge_soc = 0.65 # SOC to which we maximum charge
+    initial_charge_soc = 0.8 # SOC to which we maximum charge
     charging_rate = 2 # C-Rate for charging
 
-    P_max = P_max_mot / 0.8 # Assuming that propellers draw 80% of the power 
-    P_avg = P_avg_mot / 0.8 # Assuming that propellers draw 80% of the power
+    '''------------Additional Battery Parameters----------------'''
+
+    P_max = P_max_mot / 0.95 # Assuming that propellers draw 80% of the power 
+    P_avg = P_avg_mot / 0.95 # Assuming that propellers draw 80% of the power
 
     '''---------------Additional Time calculations/parameters-------------------'''
 
@@ -78,19 +81,20 @@ def LiPo_sim (P_max_mot=320,P_avg_mot=128,t_flight=10):
     '''--------------Battery Performance Calculations------------------'''
 
     used_charge = 0.0 # Initialise used charge for calculation [As]
-    P_actual = P_avg # Initialise P_actual delivered [W] 
+    P_actual = P_avg # Initialise P_actual delivered [W]
+    
 
     # For loop for calculating C-rate, etc. of battery during flight
     for idx, time in enumerate(t):
 
         battery_soc = (initial_charge - used_charge) / battery_capacity
-
         Vocv_per_cell = Vocv_poly(battery_soc)
-
+        R_eff = R_eff_initial * R_eff_poly(battery_soc)
+        
         transition = smoothstep((time - t_max_power[0]) / t_ramp) - smoothstep((time - t_max_power[-1]) / t_ramp)
 
         P_target = P_avg + (P_max - P_avg) * transition
-
+        
         if P_target > P_actual:
             tau_use = tau_up
         else:
@@ -99,14 +103,21 @@ def LiPo_sim (P_max_mot=320,P_avg_mot=128,t_flight=10):
         P_actual += (P_target - P_actual) * (dt / tau_use)
         P_delivered = P_actual
 
-        V_pack = num_cells * Vocv_per_cell
-        R_pack = num_cells * R_i
+        V_ocv_pack = num_cells * Vocv_per_cell
+        R_pack = num_cells * R_eff
 
-        disc = V_pack**2 - 4 * R_pack * P_delivered
-
-        I_drawn  = (V_pack - np.sqrt(disc)) / (2*R_pack)
-
-        V_delivered = V_pack - I_drawn*R_pack
+        #---------Quick Check--------------------
+        max_power_possible = (V_ocv_pack ** 2) / (4*R_pack)
+        fail_mask = P_target > max_power_possible
+        if fail_mask.any():
+            print("Demanded Power: ", P_target, "Max Power Possible: ", max_power_possible)
+            idx = np.where(fail_mask)[0][0]  # first failing index (or choose logic)
+            print(f"Power demand not feasible at t = {time}, cycle = {idx}")
+            break
+        #------------End------------------------
+        disc = V_ocv_pack**2 - 4 * R_pack * P_delivered
+        I_drawn  = (V_ocv_pack - np.sqrt(disc)) / (2*R_pack)
+        V_delivered = V_ocv_pack - I_drawn*R_pack
 
         time_interval_charge_used = I_drawn * dt
         used_charge += time_interval_charge_used
@@ -118,11 +129,14 @@ def LiPo_sim (P_max_mot=320,P_avg_mot=128,t_flight=10):
         V_arr[:,idx] = V_delivered
         I_arr[:,idx] = I_drawn
 
+    I_max_vec = np.max(I_arr,axis=1)
+    soc_min_vec = np.min(soc_arr,axis=1)   
+    V_min_vec = np.min(V_arr,axis=1)
     C_rate_max_vec = np.max(C_rate_arr,axis=1)
     DoD = initial_charge_soc - soc_arr[:,-1]
     recharge_time = (DoD) * 3600 / charging_rate
 
-    return number_of_cycles,C_rate_max_vec,recharge_time
+    return number_of_cycles,C_rate_max_vec,recharge_time, V_min_vec, soc_min_vec, I_max_vec
 
    
 
@@ -133,7 +147,7 @@ if __name__ == "__main__":
     '''---------------Main Function------------------'''
     start = time.perf_counter()
     
-    cycle_vec,C_rate_max_vec,_ = LiPo_sim()
+    cycle_vec,C_rate_max_vec,_, V_min_vec, soc_min_vec, I_max_vec = LiPo_sim()
     
     end = time.perf_counter()
 
@@ -141,13 +155,24 @@ if __name__ == "__main__":
 
     '''---------------Plotting------------------'''
 
-    fig,ax = plt.subplots(figsize=(9,5))
+    fig,ax = plt.subplots(2,2,figsize=(9,5))
 
-    ax.plot(cycle_vec, C_rate_max_vec, color='Steelblue', linewidth=2)
+    ax[0,0].plot(cycle_vec, C_rate_max_vec, color='Steelblue', linewidth=2)
+    ax[1,0].plot(cycle_vec, V_min_vec, color='Red', linewidth=2)
+    ax[0,1].plot(cycle_vec, soc_min_vec, color='Green', linewidth=2)
+    ax[1,1].plot(cycle_vec, I_max_vec, color='Green', linewidth=2)
 
+    ax[0,0].set_xlabel('Cycle Number(-)')
+    ax[0,0].set_ylabel('Max C_rate(-)')
 
-    ax.set_xlabel('Cycle Number(-)')
-    ax.set_ylabel('Max C_rate(-)')
+    ax[1,0].set_xlabel('Cycle Number(-)')
+    ax[1,0].set_ylabel('Min Voltage')
+
+    ax[0,1].set_xlabel('Cycle Number(-)')
+    ax[0,1].set_ylabel('Min SOC')
+
+    ax[1,1].set_xlabel('Cycle Number(-)')
+    ax[1,1].set_ylabel('Maximum current')
 
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
