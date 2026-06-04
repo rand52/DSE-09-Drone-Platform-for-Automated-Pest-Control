@@ -4,7 +4,7 @@ from __future__ import annotations
 import mujoco
 import numpy as np
 
-MAX_PITCH_RATE = 300.0   # deg/s
+MAX_PITCH_RATE = 30.0   # deg/s
 
 
 class FlightController:
