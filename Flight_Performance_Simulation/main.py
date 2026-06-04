@@ -12,7 +12,7 @@ from controller import FlightController
 
 #Loading drone model and moth path
 Model_path = r"Flight_Performance_Simulation\chameleon.xml"
-Moth_Log = "log_itrk5.csv"
+Moth_Log = r"Flight_Performance_Simulation\files\log_itrk3.csv"
 
 
 # Drone parameters
@@ -60,7 +60,7 @@ def main():
     spool_vadr  = model.jnt_dofadr[jid_spool]
     k_spring    = abs(float(model.tendon_solref_lim[tid][0]))
     model.tendon_stiffness[tid] = k_spring
-    aero = AeroEngine(model, data, cd_csv_path=r"Cd_values.csv", body_name="drone", area=Drone_area)
+    aero = AeroEngine(model, data, cd_csv_path=r"Flight_Performance_Simulation\files\Cd_values.csv", body_name="drone", area=Drone_area)
     ctrl = FlightController(model, data, body_name="drone",
                             max_thrust=Max_Thrust, mass=Drone_Mass, gravity=9.81)
 
