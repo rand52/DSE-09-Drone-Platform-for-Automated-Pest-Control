@@ -87,7 +87,7 @@
     <!--Tether, negative values are such that we bypass time constant-->
     <!--K and B need UPDATE-->
     <tendon>
-        <spatial name="tether" width="0.0022" rgba="0.95 0.95 0.88 1" limited="true" range="0 1.5" solreflimit="-5000 -15" solimplimit="0.95 0.99 0.001">
+        <spatial name="tether" width="0.0022" rgba="0.95 0.95 0.88 1" limited="true" range="0 15" solreflimit="-5000 -15" solimplimit="0.95 0.99 0.001">
             <site site="tether_anchor"/>
             <site site="drone_mount"/>
         </spatial>

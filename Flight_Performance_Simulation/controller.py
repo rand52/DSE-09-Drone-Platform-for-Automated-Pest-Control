@@ -32,6 +32,10 @@ class FlightController:
         # Caller should set this to point toward the moth before first step.
         self.thrust_dir = np.array([0.0, 0.0, 1.0])
 
+        jnt_adr = model.body_jntadr[self.body_id]  #added for thrust
+        self._free_qposadr = int(model.jnt_qposadr[jnt_adr])  #added for thrust
+        self._free_dofadr  = int(model.jnt_dofadr[jnt_adr])   #added for thrust
+
     def _actuator_id(self, name):
         aid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, name)
         if aid < 0:
@@ -75,16 +79,27 @@ class FlightController:
     def hover_thrust(self):
         return self.mass * self.gravity
 
+    def _thrust_dir_to_quat(self) -> np.ndarray:  #added for thrust
+        """Quaternion [w,x,y,z] that rotates body +X onto thrust_dir."""  #added for thrust
+        x = np.array([1.0, 0.0, 0.0])  #added for thrust
+        d = self.thrust_dir  #added for thrust
+        dot = float(np.clip(np.dot(x, d), -1.0, 1.0))  #added for thrust
+        if dot > 1.0 - 1e-7:  #added for thrust
+            return np.array([1.0, 0.0, 0.0, 0.0])  #added for thrust
+        if dot < -1.0 + 1e-7:  #added for thrust
+            return np.array([0.0, 0.0, 1.0, 0.0])  # 180 deg around Y  #added for thrust
+        axis = np.cross(x, d)  #added for thrust
+        axis /= np.linalg.norm(axis)  #added for thrust
+        half = np.arccos(dot) * 0.5  #added for thrust
+        return np.array([np.cos(half), *(np.sin(half) * axis)])  #added for thrust
+
     def attitude_hold_torque(self, kp=0.6, kd=0.08):
-        quat = self.data.xquat[self.body_id].copy()
-        if quat[0] < 0:
-            quat = -quat
-        att_err = 2.0 * quat[1:4]
-        mujoco.mj_objectVelocity(
-            self.model, self.data, mujoco.mjtObj.mjOBJ_BODY,
-            self.body_id, self._vel6, 0)
-        omega = self._vel6[0:3]
-        return -kp * att_err - kd * omega
+        # Lock body +X (top cap) exactly to thrust_dir by writing qpos directly.  #added for thrust
+        # Rate-limiting is handled upstream by rotate_thrust_toward, not here.    #added for thrust
+        q = self._thrust_dir_to_quat()  #added for thrust
+        self.data.qpos[self._free_qposadr + 3 : self._free_qposadr + 7] = q  #added for thrust
+        self.data.qvel[self._free_dofadr  + 3 : self._free_dofadr  + 6] = 0.0  #added for thrust
+        return np.zeros(3)  #added for thrust
 
     def apply_drone_wrench(self, thrust_magnitude, drag_force, attitude_hold=True):
         """Apply thrust along body axis (thrust_dir) + drag. Returns thrust vector."""

@@ -16,7 +16,7 @@ Moth_Log = "log_itrk3.csv"
 
 
 # Drone parameters
-Drone_Mass = 0.143 #grams
+Drone_Mass = 0.143 #kg
 TW_ratio = 4 #Thrust to weight ratio
 Max_Thrust = Drone_Mass*TW_ratio*9.81 #newtons
 Drone_area = 0.01 #m^2 FIND VALUES
@@ -35,6 +35,8 @@ REEL_KP        = 6.0        # reel velocity-servo gain [N/(m/s)]
 REEL_FORCE_MAX = 25.0       # max reel pull force [N]
 REEL_HOME      = 0.30
 
+
+SLOW_MO = 8.0  # 1.0 = real time, 4.0 = 4x slower, 0.5 = 2x faster
 
 INTERCEPT, BRAKE, REEL = 0, 1, 2
 STATE_NAMES = {INTERCEPT: "INTERCEPT", BRAKE: "BRAKE", REEL: "REEL"}
@@ -58,7 +60,7 @@ def main():
     spool_vadr  = model.jnt_dofadr[jid_spool]
     k_spring    = abs(float(model.tendon_solref_lim[tid][0]))
     model.tendon_stiffness[tid] = k_spring
-    aero = AeroEngine(model, data, body_name="drone", Cd=Drone_Cd, area=Drone_area)
+    aero = AeroEngine(model, data, cd_csv_path=r"Cd_values.csv", body_name="drone", area=Drone_area)
     ctrl = FlightController(model, data, body_name="drone",
                             max_thrust=Max_Thrust, mass=Drone_Mass, gravity=9.81)
 
@@ -72,6 +74,7 @@ def main():
     to_moth     = moth.start_pos - drone_pos0 #Vector from drone to moth
     to_moth_n   = float(np.linalg.norm(to_moth)) # Length of set vector
     Thrust_dir_0 = to_moth/to_moth_n #Unit vector towards moth and initial vector
+    ctrl.thrust_dir = Thrust_dir_0.copy()
 
     #Loop bookkeeping
     state = INTERCEPT
@@ -82,13 +85,14 @@ def main():
 
         t = data.time
         pos = data.xpos[bid].copy()
-        vel = aero.body_velocity() #Runs velocity calculations
+        vel, _ = aero.body_velocity() #Runs velocity calculations (world frame)
         speed = float(np.linalg.norm(vel)) #length of vel
 
         drag     = aero.compute_drag()
         L        = float(data.ten_length[tid])
         Ldot     = float(data.ten_velocity[tid])
         moth_p = moth.position(t)
+        data.mocap_pos[moth_mid] = moth_p
 
         if state == INTERCEPT:
             target = moth.position(t) #Location of the moth
@@ -109,7 +113,6 @@ def main():
 
         elif state == BRAKE:
             ## Thrust becomes 0
-
             desired_dir = drone_pos0/np.linalg.norm(drone_pos0) #Vector from spool to drone
             ctrl.rotate_thrust_toward(np.array(desired_dir), dt)  # FIX 3: dt was inside np.array(), moved outside as separate argument
             thrust_cmd = 0 #TODO try if thrust reduces the bouncing
@@ -119,7 +122,7 @@ def main():
             ctrl.set_reel_torque(0.0)
 
             P_slip = L - (ramp*F_brake) / k_spring
-            P = max(P, P_slip)  # FIX 4: was lowercase p — typo meant P was never updated in BRAKE
+            P = min(P, P_slip)  # allow P to slip downward under braking force
 
             if L > 1e-6:
                 u_away   = (pos - [0,0,0]) / L
@@ -127,6 +130,7 @@ def main():
             else:
                 v_radial = 0.0
             if v_radial <= 0.0 and (t - t_state_enter) > 0.5 * BRAKE_RAMP:
+                print(f"started braking at {t} seconds")
                 state, t_state_enter = REEL, t
         else: #Reeling
             desired_dir = drone_pos0/np.linalg.norm(drone_pos0)
@@ -145,10 +149,11 @@ def main():
             ctrl.set_reel_torque(10.0)
             ctrl.set_brake_friction(0.0)
             if dist_dock <= REEL_HOME:
-                return False
+                return
 
         P = max(P, 0.02)
-        model.tendon_lengthspring[tid] = [0.0, P]  # FIX 5: was [0,0,P] (3 elements) — tendon_lengthspring takes 2 values [lower, upper]
+        model.tendon_lengthspring[tid] = [0.0, P]
+        model.tendon_range[tid, 1] = P  # update hard constraint so MuJoCo enforces the new max length
 
         stretch = L - P
         if stretch > 0.0:
@@ -162,11 +167,28 @@ def main():
             damp_force = np.zeros(3)
 
 
-        thrust_actual = ctrl.apply_drone_wrench(thrust_cmd, drag, attitude_hold=False)
+        thrust_actual = ctrl.apply_drone_wrench(thrust_cmd, drag, attitude_hold=(state == INTERCEPT))
         data.xfrc_applied[bid, 0:3] += damp_force
 
+    def reset():
+        nonlocal state, P, t_state_enter, t
+        mujoco.mj_resetData(model, data)
+        data.mocap_pos[moth_mid] = moth.start_pos
+        mujoco.mj_forward(model, data)
+        P = float(data.ten_length[tid]) + SLACK_MARGIN
+        model.tendon_lengthspring[tid] = [0.0, P]
+        model.tendon_range[tid, 1] = P
+        ctrl.thrust_dir = Thrust_dir_0.copy()
+        state = INTERCEPT
+        t_state_enter = 0.0
+        t = 0.0
+
+    def key_callback(keycode):
+        if keycode == ord('R'):
+            reset()
+
     t = 0.0
-    with mujoco.viewer.launch_passive(model, data) as viewer:
+    with mujoco.viewer.launch_passive(model, data, key_callback=key_callback) as viewer:
         while viewer.is_running() and t < 100.0:  # FIX 7: removed state != REEL — loop was exiting immediately when REEL began, so reel-in never ran
             step_start = time.time()
             result = step_logic()  # FIX 8: capture return value so docking (return False) stops the loop
@@ -176,7 +198,7 @@ def main():
             t += dt
             viewer.sync()
             elapsed = time.time() - step_start
-            time.sleep(max(0, dt - elapsed))
+            time.sleep(max(0, dt * SLOW_MO - elapsed))
 
 
 
