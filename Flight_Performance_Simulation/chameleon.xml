@@ -20,7 +20,7 @@
     </asset>
 
     <worldbody>
-        <camera name="default_view" pos="0 -4 1.5" xyaxes="-1 0 0 0 0 1"/>
+        <camera name="default_view" pos="-0.182 -8.326 0.000" xyaxes="1.000 -0.022 0.000 -0.000 -0.000 1.000"/>
         <!--General Setup, ceiling and floor 3 meters apart, as will be established in report, also make it daylight-->
         <light name="sun" directional="true" castshadow="true" pos="0 0 10" dir="0.5 0.5 1" diffuse="0.95 0.95 0.9" specular="0.3 0.3 0.3"/>
         <geom name="floor" type="plane" pos="0 0 -3" size="8 8 0.1" material="grid_mat"/>

@@ -14,7 +14,7 @@ from controller import FlightController
 
 #Loading drone model and moth path
 Model_path = r"Flight_Performance_Simulation\chameleon.xml"
-Moth_Log = r"Flight_Performance_Simulation\files\log_itrk3.csv"
+Moth_Log = r"Flight_Performance_Simulation\files\log_itrk5.csv"
 
 
 # Drone parameters
@@ -26,9 +26,9 @@ Drone_area = 0.01 #m^2 FIND VALUES
 Drone_pitch_rate = 30 # degrees/s
 SLACK_MARGIN = 0.03
 Capture_Radius = 0.18 #meter TODO: check if neccesary
-F_brake = 80 # N  max tether force the spool brake can hold before it slips (Coulomb).
+F_brake = 250 # N  max tether force the spool brake can hold before it slips (Coulomb).
              #    Tuned so the drone stops (~1.7 m, ~17 g peak) without hitting the floor/walls.
-BRAKE_RAMP = 0.2 #seconds  time to ramp the brake from 0 to full
+BRAKE_RAMP = 0.05 #seconds  time to ramp the brake from 0 to full
 Spool_pos = [0,0,0]
 # Tether axial damping. C_TAUT is recomputed each step as a fraction of critical damping
 # (C = 2*ZETA*sqrt(k*m)); ZETA < 1 -> underdamped. Tune ZETA once we have a target response.
@@ -37,7 +37,7 @@ ZETA   = 0.3   # tether damping ratio (underdamped placeholder — TODO tune)
 
 # Wire properties for length-dependent stiffness k = AE/L
 WIRE_DIAMETER    = 0.0005                                # m  (0.5 mm — verify)
-WIRE_E           = 3e9                                   # Pa (Nylon, 3 GPa — verify from datasheet)
+WIRE_E           = 2e9                                   # Pa (Nylon, 3 GPa — verify from datasheet)
 WIRE_A           = math.pi * (WIRE_DIAMETER / 2) ** 2    # m^2 cross-section area
 
 # ------------------------------------------------------------------------------------------
@@ -60,7 +60,7 @@ HARD_LIMIT_MARGIN = 0.5                                  # m  solver limit backs
 #Reel in settings
 REEL_SPEED     = 1.5        # reel-in target speed [m/s]
 REEL_KP        = 6.0        # reel velocity-servo gain [N/(m/s)]
-REEL_FORCE_MAX = 5.0       # max reel pull force [N]
+REEL_FORCE_MAX = 5.0       # max reel pull force [N] 
 REEL_HOME      = 0.30
 
 
@@ -141,9 +141,10 @@ def main():
     prev_vel            = np.zeros(3)
     g_force_log         = []  # (time, g_force) during BRAKE
     tension             = 0.0  # last-step tether tension, feeds the spool model
+    max_tension         = 0.0  # peak tether tension over the run [N]
 
     def step_logic():
-        nonlocal state, P, Pdot, tension, t_state_enter, p_brake_start, p_reel_start, max_speed_intercept, max_g_brake, prev_vel, g_force_log
+        nonlocal state, P, Pdot, tension, max_tension, t_state_enter, p_brake_start, p_reel_start, max_speed_intercept, max_g_brake, prev_vel, g_force_log
 
         t = data.time
         pos = data.xpos[bid].copy()
@@ -190,7 +191,7 @@ def main():
             ## Thrust becomes 0
             desired_dir = drone_pos0/np.linalg.norm(drone_pos0) #Vector from spool to drone
             ctrl.rotate_thrust_toward(np.array(desired_dir), dt)  # FIX 3: dt was inside np.array(), moved outside as separate argument
-            thrust_cmd = Max_Thrust #TODO try if thrust reduces the bouncing
+            thrust_cmd = Max_Thrust  * 0.3#TODO try if thrust reduces the bouncing
 
             ramp = min((t - t_state_enter) / BRAKE_RAMP, 1.0)
             ctrl.set_brake_friction(ramp * 5.0)   # cosmetic: actuator ctrl mirrors brake engagement
@@ -247,6 +248,7 @@ def main():
             # Damping acts on the true elongation rate (Ldot - Pdot): when the spool pays out with
             # the drone there is no stretch rate, so the brake (not the damper) governs braking.
             tension = max(0.0, spring + C_TAUT * (Ldot - Pdot))
+            max_tension = max(max_tension, tension)
             u       = Spool_pos - data.site_xpos[sid_mount]  # FIX 6: was spool_pos (undefined) — matches global Spool_pos
             nrm     = np.linalg.norm(u)
             damp_force = ((tension - spring) / nrm) * u if nrm > 1e-9 else np.zeros(3)
