@@ -1,8 +1,10 @@
 #imports
+import math
 import mujoco
 import numpy as np
 import mujoco.viewer
 import time
+import matplotlib.pyplot as plt
 from moth import MothTrajectory
 
 from aero import AeroEngine
@@ -17,17 +19,26 @@ Moth_Log = r"Flight_Performance_Simulation\files\log_itrk3.csv"
 
 # Drone parameters
 Drone_Mass = 0.143 #kg
-TW_ratio = 3 #Thrust to weight ratio
+TW_ratio = 5 #Thrust to weight ratio
 Max_Thrust = Drone_Mass*TW_ratio*9.81 #newtons
 Drone_area = 0.01 #m^2 FIND VALUES
 #Drone_Cd = 1.0 #Coefficient of drag FIND VALUES
 Drone_pitch_rate = 30 # degrees/s
 SLACK_MARGIN = 0.03
 Capture_Radius = 0.18 #meter TODO: check if neccesary
-F_brake = 10 # Newtons
-BRAKE_RAMP = 0.1 #seconds
+F_brake = 5 # Newtons
+BRAKE_RAMP = 0.3 #seconds
 Spool_pos = [0,0,0]  
-C_TAUT = 0.0  # FIX 1: was undefined — tether damping coefficient, set to 0 as placeholder TODO: tune value
+# Tether axial damping. C_TAUT is recomputed each step as a fraction of critical damping
+# (C = 2*ZETA*sqrt(k*m)); ZETA < 1 -> underdamped. Tune ZETA once we have a target response.
+C_TAUT = 0.0   # recomputed every step in step_logic()
+ZETA   = 0.3   # tether damping ratio (underdamped placeholder — TODO tune)
+
+# Wire properties for length-dependent stiffness k = AE/L
+WIRE_DIAMETER    = 0.0005                                # m  (0.5 mm — verify)
+WIRE_E           = 3e9                                   # Pa (Nylon, 3 GPa — verify from datasheet)
+WIRE_A           = math.pi * (WIRE_DIAMETER / 2) ** 2    # m^2 cross-section area
+HARD_LIMIT_MARGIN = 0.5                                  # m  solver limit sleeps unless tether runs away
 
 #Reel in settings
 REEL_SPEED     = 3.0        # reel-in target speed [m/s]
@@ -36,7 +47,7 @@ REEL_FORCE_MAX = 25.0       # max reel pull force [N]
 REEL_HOME      = 0.30
 
 
-SLOW_MO = 8.0  # 1.0 = real time, 4.0 = 4x slower, 0.5 = 2x faster
+SLOW_MO  = 8.0    # 1.0 = real time, 4.0 = 4x slower, 0.5 = 2x faster
 
 INTERCEPT, BRAKE, REEL = 0, 1, 2
 STATE_NAMES = {INTERCEPT: "INTERCEPT", BRAKE: "BRAKE", REEL: "REEL"}
@@ -58,7 +69,8 @@ def main():
     moth_mid    = model.body_mocapid[moth_bid]
     spool_qadr  = model.jnt_qposadr[jid_spool]
     spool_vadr  = model.jnt_dofadr[jid_spool]
-    k_spring    = abs(float(model.tendon_solref_lim[tid][0]))
+    L0          = float(data.ten_length[tid]) + SLACK_MARGIN   # initial deployed length
+    k_spring    = (WIRE_A * WIRE_E) / max(L0, 1e-3)            # AE/L at startup
     model.tendon_stiffness[tid] = k_spring
     aero = AeroEngine(model, data, cd_csv_path=r"Flight_Performance_Simulation\files\Cd_values.csv", body_name="drone", area=Drone_area)
     ctrl = FlightController(model, data, body_name="drone",
@@ -87,9 +99,10 @@ def main():
     max_speed_intercept = 0.0
     max_g_brake         = 0.0
     prev_vel            = np.zeros(3)
+    g_force_log         = []  # (time, g_force) during BRAKE
 
     def step_logic():
-        nonlocal state, P, t_state_enter, p_brake_start, p_reel_start, max_speed_intercept, max_g_brake, prev_vel
+        nonlocal state, P, t_state_enter, p_brake_start, p_reel_start, max_speed_intercept, max_g_brake, prev_vel, g_force_log
 
         t = data.time
         pos = data.xpos[bid].copy()
@@ -99,6 +112,9 @@ def main():
         drag     = aero.compute_drag()
         L        = float(data.ten_length[tid])
         Ldot     = float(data.ten_velocity[tid])
+        k_spring = (WIRE_A * WIRE_E) / max(L, 1e-3)   # update stiffness: k = AE/L
+        model.tendon_stiffness[tid] = k_spring
+        C_TAUT = 2.0 * ZETA * math.sqrt(k_spring * Drone_Mass)  # fraction of critical damping
         moth_p = moth.position(t)
         moth_p[2] += 1.5
 
@@ -128,6 +144,7 @@ def main():
         elif state == BRAKE:
             g_force = float(np.linalg.norm(vel - prev_vel) / dt / 9.81)
             max_g_brake = max(max_g_brake, g_force)
+            g_force_log.append((t, g_force))
             ## Thrust becomes 0
             desired_dir = drone_pos0/np.linalg.norm(drone_pos0) #Vector from spool to drone
             ctrl.rotate_thrust_toward(np.array(desired_dir), dt)  # FIX 3: dt was inside np.array(), moved outside as separate argument
@@ -173,7 +190,7 @@ def main():
 
         P = max(P, 0.02)
         model.tendon_lengthspring[tid] = [0.0, P]
-        model.tendon_range[tid, 1] = P  # update hard constraint so MuJoCo enforces the new max length
+        model.tendon_range[tid, 1] = P + HARD_LIMIT_MARGIN  # floating hard limit: solver only fires on runaway
 
         stretch = L - P
         if stretch > 0.0:
@@ -192,13 +209,13 @@ def main():
         prev_vel = vel.copy()
 
     def reset():
-        nonlocal state, P, t_state_enter, t, max_speed_intercept, max_g_brake, prev_vel
+        nonlocal state, P, t_state_enter, t, max_speed_intercept, max_g_brake, prev_vel, g_force_log
         mujoco.mj_resetData(model, data)
         data.mocap_pos[moth_mid] = moth.start_pos
         mujoco.mj_forward(model, data)
         P = float(data.ten_length[tid]) + SLACK_MARGIN
         model.tendon_lengthspring[tid] = [0.0, P]
-        model.tendon_range[tid, 1] = P
+        model.tendon_range[tid, 1] = P + HARD_LIMIT_MARGIN
         ctrl.thrust_dir = Thrust_dir_0.copy()
         state = INTERCEPT
         t_state_enter = 0.0
@@ -206,6 +223,7 @@ def main():
         max_speed_intercept = 0.0
         max_g_brake         = 0.0
         prev_vel            = np.zeros(3)
+        g_force_log         = []
 
     def key_callback(keycode):
         if keycode == ord('R'):
@@ -214,7 +232,7 @@ def main():
     t = 0.0
     print(f"The braking started at {p_brake_start}")
     with mujoco.viewer.launch_passive(model, data, key_callback=key_callback) as viewer:
-        while viewer.is_running() and t < 100.0:  # FIX 7: removed state != REEL — loop was exiting immediately when REEL began, so reel-in never ran
+        while viewer.is_running() and t < 100:
             step_start = time.time()
             result = step_logic()  # FIX 8: capture return value so docking (return False) stops the loop
             if result is False:
@@ -225,7 +243,15 @@ def main():
             elapsed = time.time() - step_start
             time.sleep(max(0, dt * SLOW_MO - elapsed))
 
-
+    if g_force_log:
+        times, gforces = zip(*g_force_log)
+        plt.figure()
+        plt.plot(times, gforces)
+        plt.xlabel("Time (s)")
+        plt.ylabel("G-force (g)")
+        plt.title("G-force during braking")
+        plt.grid(True)
+        plt.show()
 
 
 main()
