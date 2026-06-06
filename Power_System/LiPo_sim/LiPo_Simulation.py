@@ -12,7 +12,7 @@ def LiPo_sim (P_max=320,P_avg=128,t_flight=10):
 
     '''------------Battery Parameters----------------'''
 
-    R_i = 0.03 # Internal resistance of battery [Ohms]
+    R_i = 0.018 # Internal resistance of battery [Ohms]
     num_cells = 4 # Number of cells in the batetry
     nominal_battery_capacity_Ah = 0.5 # Assumed capacity of battery [Ah]
     avg_DoD = 0.3 # Average DoD that the battery will have as a fraction

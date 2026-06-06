@@ -4,6 +4,7 @@ import scienceplots
 from Final_Model_Fit_Discharge import intercept,coef
 from Final_Model_Fit_Internal_Resistance import intercept_res,coef_res
 import time
+from Resistance_degradation import r0_growth_factor
 
 plt.style.use(['science', 'no-latex', 'grid'])
  
@@ -31,7 +32,7 @@ def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
     '''------------Battery Parameters To Enter For Each Battery----------------'''
     Cycle_to_display = 0 # Cycle to display in detail
     number_of_cycles_to_simulate = 500
-    R_eff_initial = 0.018 # Initial condition for internal resistance
+    R_eff_initial_cycle_0 = 0.018 # Initial condition for internal resistance
     num_cells = 4 # Number of cells in the batetry
     nominal_battery_capacity_Ah = 0.32 # Assumed capacity of battery [Ah]
     avg_DoD = 0.3 # Average DoD that the battery will have as a fraction
@@ -63,7 +64,7 @@ def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
     '''-------------Degradation Calculations----------------'''
     # Calculations
     number_of_cycles = np.arange(0,number_of_cycles_to_simulate,1) # VECTOR with cycles
-    number_of_equiv_cycles = number_of_cycles * avg_DoD # Equivalent actual full cycles the battery has gone through
+    number_of_equiv_cycles = number_of_cycles * avg_DoD * 2 # Equivalent actual full cycles the battery has gone through
     
    # Degradation Model
     degradation_frac = 1.085 - 0.07961 * np.exp(0.00563*number_of_equiv_cycles) # VECTOR for each cycle
@@ -71,6 +72,8 @@ def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
     battery_capacity_Ah = battery_capacity / 3600 # VECTOR
     initial_charge = battery_capacity * initial_charge_soc # VECTOR
 
+    # Resistance degradation
+    R_eff_initial = r0_growth_factor(number_of_equiv_cycles) * R_eff_initial_cycle_0
     '''------------Initializing Battery Performance Arrays----------------'''
 
     C_rate_arr = np.empty((number_of_cycles_to_simulate,len(t)))
