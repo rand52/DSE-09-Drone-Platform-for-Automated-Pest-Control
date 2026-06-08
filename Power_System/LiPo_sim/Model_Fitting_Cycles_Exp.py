@@ -43,8 +43,8 @@ for num, path in file_paths.items():
 # =========================================================
 # 3. FIT THE 3-PARAMETER MODEL ON STRESS 5
 # =========================================================
-x_train = datasets[4]["x"]
-y_train = datasets[4]["y"]
+x_train = datasets[5]["x"]
+y_train = datasets[5]["y"]
 
 # TARGETED GUESSES FOR RAW CYCLES:
 # a = 1.02 (starts right near the top)

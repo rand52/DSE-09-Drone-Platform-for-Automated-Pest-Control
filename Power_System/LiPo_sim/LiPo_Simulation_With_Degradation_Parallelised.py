@@ -28,14 +28,17 @@ def R_eff_poly(x):
      return intercept_res + coef_res[0] * x
 
 def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
-
+    '''------------Monte Carlo Simulation---------------'''
+    mean = 0.00704
+    c = np.random.normal(mean,0.2*mean)
     '''------------Battery Parameters To Enter For Each Battery----------------'''
     Cycle_to_display = 0 # Cycle to display in detail
-    number_of_cycles_to_simulate = 500
+    number_of_cycles_to_simulate = 1000
     R_eff_initial_cycle_0 = 0.018 # Initial condition for internal resistance
     num_cells = 4 # Number of cells in the batetry
     nominal_battery_capacity_Ah = 0.32 # Assumed capacity of battery [Ah]
     avg_DoD = 0.3 # Average DoD that the battery will have as a fraction
+    max_c_rate = 95 # Max C rate of battery
 
     t_p_max = 3 # Time at max power [s]
     t_t_p_max_frac = 0 # Temporal location of the start of peak power as % of total fight
@@ -64,10 +67,10 @@ def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
     '''-------------Degradation Calculations----------------'''
     # Calculations
     number_of_cycles = np.arange(0,number_of_cycles_to_simulate,1) # VECTOR with cycles
-    number_of_equiv_cycles = number_of_cycles * avg_DoD * 2 # Equivalent actual full cycles the battery has gone through
+    number_of_equiv_cycles = number_of_cycles * avg_DoD * 1.5 # Equivalent actual full cycles the battery has gone through
     
    # Degradation Model
-    degradation_frac = 1.085 - 0.07961 * np.exp(0.00563*number_of_equiv_cycles) # VECTOR for each cycle
+    degradation_frac = 1.085 - 0.07961 * np.exp(c*number_of_equiv_cycles) # VECTOR for each cycle
     battery_capacity = nominal_battery_capacity_Ah * degradation_frac * 3600 # VECTOR Battery Capacity in Amp_secs for calculation
     battery_capacity_Ah = battery_capacity / 3600 # VECTOR
     initial_charge = battery_capacity * initial_charge_soc # VECTOR
@@ -126,11 +129,13 @@ def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
         used_charge += time_interval_charge_used
         
         current_c_rate = I_drawn / (battery_capacity_Ah)
-
+        
         C_rate_arr[:,idx] = current_c_rate
         soc_arr[:,idx] = battery_soc
         V_arr[:,idx] = V_delivered
         I_arr[:,idx] = I_drawn
+
+            
 
     I_max_vec = np.max(I_arr,axis=1)
     soc_min_vec = np.min(soc_arr,axis=1)   
