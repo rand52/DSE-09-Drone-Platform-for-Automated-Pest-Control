@@ -5,6 +5,16 @@ import scipy.spatial.transform
 #Coordinate frame transformations:
 # Uses numpy so should be given in radians
 def euler_to_quat(psi, theta, phi):
+    # c_phi = np.cos(phi)
+    # s_phi = np.sin(phi)
+    # c_theta = np.cos(theta)
+    # s_theta = np.sin(theta)
+    # c_psi = np.cos(psi)
+    # s_psi = np.sin(psi)
+    # H = [[c_theta*c_psi, c_theta*s_psi, -s_theta],
+    #      [(s_phi*s_theta*c_psi)-(c_phi*s_psi), (s_phi*s_theta*s_psi)+(c_phi*c_psi), s_phi*c_theta],
+    #      [(c_phi*s_theta*c_psi)+(s_phi*s_psi), (c_phi*s_theta*s_psi)-(s_phi*c_psi), c_phi*c_theta]]
+    # h = R.from_matrix(H)
     i = R.from_euler('zyx', [psi, theta, phi], degrees=False)
     x, y, z, w = i.as_quat()
     return np.array([w, x, y, z])
