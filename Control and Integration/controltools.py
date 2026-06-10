@@ -26,13 +26,19 @@ def rates_euler_to_quat(angular_rate, q):
     q_dot = 0.5 * quat_multiply(q, [0]+ angular_rate)
     return q_dot
 
+def quat_integrate(q, q_dot, dt):
+    q = q + q_dot * dt
+    q = q / np.linalg.norm(q)  # Normalize the quaternion to maintain unit length   
+    return q
+
+
 def quat_multiply(p, q):
     p0, p1, p2, p3 = p
     q0, q1, q2, q3 = q
-    t0 = q0*p0 - q1*p1 - q2*p2 - q3*p3
-    t1 = q0*p1 + q1*p0 - q2*p3 + q3*p2
-    t2 = q0*p2 + q1*p3 + q2*p0 - q3*p1
-    t3 = q0*p3 - q1*p2 + q2*p1 + q3*p0
+    t0 = p0*q0 - p1*q1 - p2*q2 - p3*q3
+    t1 = p0*q1 + p1*q0 + p2*q3 - p3*q2
+    t2 = p0*q2 - p1*q3 + p2*q0 - p3*q1
+    t3 = p0*q3 + p1*q2 - p2*q1 - p3*q0
     return np.array([t0, t1, t2, t3])
 
 j = euler_to_quat(np.pi/2, 0, -np.pi/2)

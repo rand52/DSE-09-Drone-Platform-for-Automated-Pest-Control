@@ -1,0 +1,112 @@
+<mujoco model="chameleon">
+
+    <compiler angle="degree" coordinate="local" inertiafromgeom="auto"/>
+    <!--Gravity no longer goes the wrong way, we will need a transformation matrix to integrate with group -->
+    <option gravity="0 0 -9.81" timestep="0.002" integrator="RK4"/>
+    <size njmax="200" nconmax="100"/>
+
+    <visual>
+        <!--Change this if the camera light is too bright-->
+        <headlight diffuse="0.7 0.7 0.7" ambient="0.6 0.6 0.6" specular="0.3 0.3 0.3"/>
+        <map znear="0.02"/>
+        <quality shadowsize="2048"/>
+    </visual>
+
+    <asset>
+        <!--Stuff for the floor-->
+        <texture name="grid_tex" type="2d" builtin="checker" rgb1="0.8 0.8 0.8" rgb2="0.6 0.6 0.6" width="512" height="512"/>
+        <material name="grid_mat" texture="grid_tex" texrepeat="20 20" reflectance="0.1" rgba="1 1 1 1"/>
+        <texture name="sky" type="skybox" builtin="gradient" rgb1="0.4 0.65 0.9" rgb2="0.9 0.95 1.0" width="256" height="256"/>
+    </asset>
+
+    <worldbody>
+        <camera name="default_view" pos="-0.182 -8.326 0.000" xyaxes="1.000 -0.022 0.000 -0.000 -0.000 1.000"/>
+        <!--General Setup, ceiling and floor 3 meters apart, as will be established in report, also make it daylight-->
+        <light name="sun" directional="true" castshadow="true" pos="0 0 10" dir="0.5 0.5 1" diffuse="0.95 0.95 0.9" specular="0.3 0.3 0.3"/>
+        <geom name="floor" type="plane" pos="0 0 -3" size="8 8 0.1" material="grid_mat"/>
+        <geom name="ceiling" type="box" pos="0 0 0.04" size="4 4 0.04" rgba="0.8 0.8 0.8 1"/>
+        
+        <!--Ceiling Dock and Active Tension Spool-->
+        
+        <!--Will be free to turn horizontally and also like a spool, so problem stays 2D-->
+        <body name="dock" pos="0 0 -0.025">
+        
+        <!--FIX VALUES when we have found one online or made one in CATIA-->
+            <geom name="dock_geom" type="box" size="0.07 0.07 0.025" rgba="0.45 0.45 0.50 1" mass="2.0"/>
+            
+            <!--FIX VALUES here as well for size mass-->
+            <body name="swivel_bracket" pos="0 0 -0.045">
+            
+            <!--CHECK HERE: armature adds inertia, should prevent numerical instability, have a look whether its physically correct though-->
+            <!--Basically we need to back up damping and armature values-->
+                <joint name="swivel_yaw" type="hinge" axis="0 0 1" damping="0.02" armature="0.01"/>
+                <geom name="bracket_geom" type="box" size="0.03 0.03 0.02" rgba="0.85 0.20 0.20 1" mass="0.15"/>
+                
+                <!--FIX VALUES here as well for size mass-->
+                <!--8 mm offset for spool drum-->
+                <body name="spool_drum" pos="0 0 -0.06">
+                    <joint name="spool_roll" type="hinge" axis="0 1 0" damping="0.02" armature="0.01"/>
+                    <geom name="drum_geom" type="cylinder" size="0.032 0.022" euler="90 0 0" rgba="0.20 0.80 0.35 1" mass="0.30"/>
+
+                    <geom name="drum_mark" type="box" pos="0.030 0 0" size="0.005 0.023 0.004" euler="90 0 0" rgba="0.95 0.95 0.10 1" mass="0.001"/>
+                </body>
+                <!-- Tether anchor: visually at point where tether leaves spool, but attached in simulation to bracket, so it does not turn around y with spool -->
+                    <site name="tether_anchor" pos="0.032 0 -0.06" size="0.005" rgba="1 1 0 1"/>
+            </body>
+        </body>
+
+        <!--Chameleon Drone-->
+        <!--Right now it starts right below the dock, reconsider this when we know docking infra-->
+        <body name="drone" pos="0 0 -0.25">
+            <freejoint name="drone_free"/>
+            <!--UPDATE THIS ENTIRE PART WHEN SIZING IS IN-->
+            <!--Hollow-Cylinder Inertia (m=0.143, R= 0.0405, r=0.029, h=0.08)-->
+            <inertial pos="0 0 0" mass="0.143" diaginertia="0.000226 0.000189 0.000189"/>
+            <!--Duct Wall-->
+            <geom name="duct_geom" type="cylinder" size="0.0405 0.04" euler="0 90 0" rgba="0.20 0.50 0.85 1"/>
+            <!--Counter-Rotating propeller disc, only for visual, deleted if we have CAD model-->
+            <geom name="prop_geom" type="cylinder" size="0.036 0.004" pos="0.01 0 0" euler="0 90 0" rgba="0.15 0.15 0.18 1" mass="0.0" contype="0" conaffinity="0"/>
+             <!-- Thrust-vectoring vanes below the duct-->
+            <geom name="vane_x" type="box" size="0.012 0.003 0.036" pos="-0.045 0 0" rgba="1.0 0.55 0.05 1" mass="0.0" contype="0" conaffinity="0"/>
+            <geom name="vane_y" type="box" size="0.012 0.036 0.003" pos="-0.045 0 0" rgba="1.0 0.55 0.05 1" mass="0.0" contype="0" conaffinity="0"/>
+            <!-- Red nose stripe so we see how it turns-->
+            <geom name="nose" type="box" size="0.04 0.006 0.002" pos="0 0 0.040" rgba="0.95 0.10 0.10 1" mass="0.0" contype="0" conaffinity="0"/>
+            <!-- Top cap-->
+            <geom name="top_cap" type="cylinder" size="0.042 0.003" pos="0.043 0 0" euler="0 90 0" rgba="0.95 0.95 0.95 1" mass="0.0" contype="0" conaffinity="0"/>
+            <!-- Tether attaches near thrust vanes for now -->
+            <site name="drone_mount" pos="-0.04 0 0" size="0.006" rgba="1.0 0.3 0.0 1"/>
+            <site name="imu" pos="0 0 0" size="0.004" rgba="0 0 0 0"/>
+        </body>
+
+        <!--Moth (does nothing but nice for our simulation (if it works :))-->
+        <body name="moth" mocap="true" pos="1.334 -0.87 -2.029">
+            <geom name="moth_geom" type="sphere" size="0.035" rgba="0.95 0.85 0.15 1" contype="0" conaffinity="0"/>
+        </body>
+    </worldbody>
+
+    <!--Tether, negative values are such that we bypass time constant-->
+    <!--K and B need UPDATE-->
+    <tendon>
+        <spatial name="tether" width="0.0022" rgba="0.95 0.95 0.88 1" limited="true" range="0 15" solreflimit="-5000 -15" solimplimit="0.95 0.99 0.001">
+            <site site="tether_anchor"/>
+            <site site="drone_mount"/>
+        </spatial>
+    </tendon>
+
+    <!--Here the motor for active spooling and reeling, and also the brakes in this block-->
+    <!--UPDATE WITH REAL MOTOR VALUES-->
+    <actuator>
+        <motor name="reel_motor" joint="spool_roll" gear="1" ctrlrange="-10 10"/>
+        <damper name="friction_brake" joint="spool_roll" kv="5" ctrlrange="0 5"/>
+    </actuator>
+
+    <!--Sensors which are necessary for the python code-->
+    <sensor>
+        <jointpos      name="spool_angle" joint="spool_roll"/>
+        <jointvel      name="spool_omega" joint="spool_roll"/>
+        <accelerometer name="drone_acc"   site="imu"/>
+        <force         name="mount_force" site="drone_mount"/>
+    </sensor>
+
+</mujoco>
+
