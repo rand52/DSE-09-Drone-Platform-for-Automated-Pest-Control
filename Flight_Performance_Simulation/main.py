@@ -4,6 +4,7 @@ import mujoco
 import numpy as np
 import mujoco.viewer
 import time
+import csv
 import matplotlib.pyplot as plt
 from moth import MothTrajectory
 
@@ -14,21 +15,21 @@ from controller import FlightController
 
 #Loading drone model and moth path
 Model_path = r"Flight_Performance_Simulation\chameleon.xml"
-Moth_Log = r"Flight_Performance_Simulation\files\log_itrk5.csv"
+Moth_Log = r"Flight_Performance_Simulation\\files\\log_itrk3.csv"
 
 
 # Drone parameters
 Drone_Mass = 0.143 #kg
-TW_ratio = 5 #Thrust to weight ratio
+TW_ratio = 4#Thrust to weight ratio
 Max_Thrust = Drone_Mass*TW_ratio*9.81 #newtons
-Drone_area = 0.01 #m^2 FIND VALUES
+diameter = 96.72 * 10**-3
+Drone_area = (math.pi*diameter**2)/4 #m^2 TODO: 
 #Drone_Cd = 1.0 #Coefficient of drag FIND VALUES
 Drone_pitch_rate = 30 # degrees/s
 SLACK_MARGIN = 0.03
 Capture_Radius = 0.18 #meter TODO: check if neccesary
 F_brake = 250 # N  max tether force the spool brake can hold before it slips (Coulomb).
-             #    Tuned so the drone stops (~1.7 m, ~17 g peak) without hitting the floor/walls.
-BRAKE_RAMP = 0.05 #seconds  time to ramp the brake from 0 to full
+BRAKE_RAMP = 0.01 #seconds  time to ramp the brake from 0 to full
 Spool_pos = [0,0,0]
 # Tether axial damping. C_TAUT is recomputed each step as a fraction of critical damping
 # (C = 2*ZETA*sqrt(k*m)); ZETA < 1 -> underdamped. Tune ZETA once we have a target response.
@@ -37,7 +38,7 @@ ZETA   = 0.3   # tether damping ratio (underdamped placeholder — TODO tune)
 
 # Wire properties for length-dependent stiffness k = AE/L
 WIRE_DIAMETER    = 0.0005                                # m  (0.5 mm — verify)
-WIRE_E           = 2e9                                   # Pa (Nylon, 3 GPa — verify from datasheet)
+WIRE_E           = 1e9                                   # Pa (Nylon, 3 GPa — verify from datasheet)
 WIRE_A           = math.pi * (WIRE_DIAMETER / 2) ** 2    # m^2 cross-section area
 
 # ------------------------------------------------------------------------------------------
@@ -58,13 +59,13 @@ BREAK_STRAIN      = 0.20                                 # -  engineering strain
 HARD_LIMIT_MARGIN = 0.5                                  # m  solver limit backstop (never reached: break fires first)
 
 #Reel in settings
-REEL_SPEED     = 1.5        # reel-in target speed [m/s]
+REEL_SPEED     = 3       # reel-in target speed [m/s]
 REEL_KP        = 6.0        # reel velocity-servo gain [N/(m/s)]
-REEL_FORCE_MAX = 5.0       # max reel pull force [N] 
+REEL_FORCE_MAX = 50.0       # max reel pull force [N] 
 REEL_HOME      = 0.30
 
 
-SLOW_MO  = 1    # 1.0 = real time, 4.0 = 4x slower, 0.5 = 2x faster
+SLOW_MO  = 8    # 1.0 = real time, 4.0 = 4x slower, 0.5 = 2x faster
 
 INTERCEPT, BRAKE, REEL = 0, 1, 2
 STATE_NAMES = {INTERCEPT: "INTERCEPT", BRAKE: "BRAKE", REEL: "REEL"}
@@ -128,7 +129,7 @@ def main():
     print(moth.start_pos)
     print(to_moth)
     to_moth_n   = float(np.linalg.norm(to_moth)) # Length of set vector
-    Thrust_dir_0 = to_moth/to_moth_n #Unit vector towards moth and initial vector
+    Thrust_dir_0 = to_moth/to_moth_n + [0,0,0.3] #Unit vector towards moth and initial vector
     ctrl.thrust_dir = Thrust_dir_0.copy()
     print(Thrust_dir_0)
     #Loop bookkeeping
@@ -142,12 +143,15 @@ def main():
     g_force_log         = []  # (time, g_force) during BRAKE
     tension             = 0.0  # last-step tether tension, feeds the spool model
     max_tension         = 0.0  # peak tether tension over the run [N]
+    trajectory_log      = []   # (t, x, y, z, qw, qx, qy, qz) per step
 
     def step_logic():
-        nonlocal state, P, Pdot, tension, max_tension, t_state_enter, p_brake_start, p_reel_start, max_speed_intercept, max_g_brake, prev_vel, g_force_log
+        nonlocal state, P, Pdot, tension, max_tension, t_state_enter, p_brake_start, p_reel_start, max_speed_intercept, max_g_brake, prev_vel, g_force_log, trajectory_log
 
         t = data.time
         pos = data.xpos[bid].copy()
+        quat = data.xquat[bid].copy()  # [w, x, y, z]
+        trajectory_log.append((t, pos[0], pos[1], pos[2], quat[0], quat[1], quat[2], quat[3]))
         vel, _ = aero.body_velocity() #Runs velocity calculations (world frame)
         speed = float(np.linalg.norm(vel)) #length of vel
 
@@ -158,7 +162,7 @@ def main():
         model.tendon_stiffness[tid] = k_spring
         C_TAUT = 2.0 * ZETA * math.sqrt(k_spring * Drone_Mass)  # fraction of critical damping
         moth_p = moth.position(t)
-        moth_p[2] += 1.5
+        moth_p[2] += 1.5 
 
         data.mocap_pos[moth_mid] = moth_p
 
@@ -306,6 +310,13 @@ def main():
             viewer.sync()
             elapsed = time.time() - step_start
             time.sleep(max(0, dt * SLOW_MO - elapsed))
+
+    csv_path = r"Flight_Performance_Simulation\drone_trajectory.csv"
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["t", "x", "y", "z", "qw", "qx", "qy", "qz"])
+        writer.writerows(trajectory_log)
+    print(f"Trajectory saved to {csv_path} ({len(trajectory_log)} frames)")
 
     if g_force_log:
         times, gforces = zip(*g_force_log)

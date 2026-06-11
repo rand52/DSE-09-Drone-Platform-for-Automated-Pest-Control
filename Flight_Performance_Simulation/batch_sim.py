@@ -68,7 +68,7 @@ Spool_pos    = [0, 0, 0]
 ZETA         = 0.3
 
 WIRE_DIAMETER = 0.0005
-WIRE_E        = 2e9
+WIRE_E        = 1e9
 WIRE_A        = math.pi * (WIRE_DIAMETER / 2) ** 2
 
 R_SPOOL      = 0.032
