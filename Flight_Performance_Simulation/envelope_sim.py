@@ -103,8 +103,8 @@ INTERCEPT, BRAKE, REEL = 0, 1, 2
 # ---------------------------------------------------------------------------
 # Grid and sweep parameters
 # ---------------------------------------------------------------------------
-HEIGHTS_M   = list(np.round(np.arange(1.00, 3.00, 0.05), 10))  # [1.5, 1.75, 2.0, 2.25, 2.5, 2.75]
-DISTANCES_M = list(np.round(np.arange(0.50, 4.25, 0.05), 10))  # [0.5, 0.75, ..., 4.0]
+HEIGHTS_M   = list(np.round(np.arange(1.00, 3.00, 0.25), 10))  # [1.5, 1.75, 2.0, 2.25, 2.5, 2.75]
+DISTANCES_M = list(np.round(np.arange(0.50, 4.25, 0.25), 10))  # [0.5, 0.75, ..., 4.0]
 REEL_SPEEDS = [3.0]                                   # m/s
 
 TIMEOUT_S   = 4   # seconds per run — longer paths need more time
