@@ -290,23 +290,29 @@ def main():
         prev_vel            = np.zeros(3)
         g_force_log         = []
 
+    paused = False
+
     def key_callback(keycode):
+        nonlocal paused
         if keycode == ord('R'):
             reset()
+        elif keycode == 32:  # Spacebar
+            paused = not paused
 
     t = 0.0
     print(f"The braking started at {p_brake_start}")
     with mujoco.viewer.launch_passive(model, data, key_callback=key_callback) as viewer:
         while viewer.is_running() and t < 100:
             step_start = time.time()
-            result = step_logic()  # FIX 8: capture return value so docking (return False) stops the loop
-            if result is False:
-                break
-            mujoco.mj_step(model, data)
-            # Mirror the Python spool state onto the drum joint so it visibly spins in sync.
-            data.qpos[spool_qadr] = theta0 + (P - P0) / R_SPOOL
-            data.qvel[spool_vadr] = Pdot / R_SPOOL
-            t += dt
+            if not paused:
+                result = step_logic()  # FIX 8: capture return value so docking (return False) stops the loop
+                if result is False:
+                    break
+                mujoco.mj_step(model, data)
+                # Mirror the Python spool state onto the drum joint so it visibly spins in sync.
+                data.qpos[spool_qadr] = theta0 + (P - P0) / R_SPOOL
+                data.qvel[spool_vadr] = Pdot / R_SPOOL
+                t += dt
             viewer.sync()
             elapsed = time.time() - step_start
             time.sleep(max(0, dt * SLOW_MO - elapsed))
