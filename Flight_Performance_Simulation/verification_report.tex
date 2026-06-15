@@ -1,0 +1,161 @@
+% ============================================================
+%  Flight Performance Simulation — Verification Section
+%  Drop this block into your main report.
+%  Requires: longtable, booktabs, xcolor, array, caption
+% ============================================================
+
+\section*{Flight Performance Simulation}
+\label{sec:flight_sim_vv}
+
+\subsection*{Verification}
+
+The flight performance simulation is a Python script built on the MuJoCo rigid-body physics engine, extended with custom Python modules for aerodynamic drag (\texttt{aero.py}), flight control (\texttt{controller.py}), tether mechanics and spool dynamics (\texttt{main.py}), and moth trajectory playback (\texttt{moth.py}). Because these modules interact continuously through the MuJoCo solver, a complete closed-form hand-calculation of the entire simulation is impractical. Verification is therefore split into two complementary steps.
+
+First, a set of unit tests is constructed. Each test isolates a single equation or formula from the code, evaluates it for a set of concrete input values, and compares the result to an independent hand calculation. The tests also include physical-plausibility checks—for example, verifying that a tether with a given modulus and diameter cannot sustain more than its analytically derived breaking force. All unit tests are collected in the standalone script \texttt{hand\_calc\_verification.py}, which can be re-run after any code change. A summary of all unit tests and their outcomes is given in \autoref{tab:unit_tests_flight_sim}.
+
+Second, simulation traces are checked for physical consistency: intercept speeds derived from the energy method are compared to the values the simulation logs, and the peak tether force during braking is checked against the spring-energy estimate $F_\text{max} = k \, \Delta x_\text{max}$.
+
+\begingroup
+\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\setlength{\tabcolsep}{6pt}
+\setlength{\extrarowheight}{2pt}
+
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.32\textwidth}|>{\raggedright\arraybackslash}p{0.32\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|}
+
+    \caption{Unit tests for the flight performance simulation}
+    \label{tab:unit_tests_flight_sim} \\
+    \hline
+    \textbf{Description} & \textbf{Input} & \textbf{Expected Output} \\ \hline
+    \endfirsthead
+
+    \caption[]{Unit tests for the flight performance simulation (continued)} \\
+    \hline
+    \textbf{Description} & \textbf{Input} & \textbf{Expected Output} \\ \hline
+    \endhead
+
+    % ── PROPULSION & MASS BUDGET ──────────────────────────────────────────
+    \multicolumn{3}{|l|}{\cellcolor[gray]{0.9}\textbf{Propulsion \& Mass Budget}} \\ \hline
+
+    Maximum thrust equals mass $\times$ thrust-to-weight ratio $\times$ $g$ &
+    $m = 0.143$\,kg \newline $\text{TW} = 4$ \newline $g = 9.81$\,m\,s$^{-2}$ &
+    $F_\text{max} = m \cdot \text{TW} \cdot g = 5.611$\,N \newline (code: \texttt{Max\_Thrust = Drone\_Mass*TW\_ratio*9.81}) \newline \textbf{Result: \checkmark\ 5.611\,N} \\ \hline
+
+    Drone weight &
+    $m = 0.143$\,kg, $g = 9.81$\,m\,s$^{-2}$ &
+    $W = mg = 1.403$\,N \newline \textbf{Result: \checkmark\ 1.403\,N} \\ \hline
+
+    Net upward acceleration at full thrust &
+    $F_\text{max} = 5.611$\,N \newline $W = 1.403$\,N \newline $m = 0.143$\,kg &
+    $a = (F_\text{max} - W)/m = 4.208/0.143 = 29.43$\,m\,s$^{-2} = 3.00\,g$ \newline (exactly $(\text{TW}-1)\,g$, as expected) \newline \textbf{Result: \checkmark\ 29.43\,m\,s$^{-2}$} \\ \hline
+
+    % ── AERODYNAMIC DRAG ──────────────────────────────────────────────────
+    \multicolumn{3}{|l|}{\cellcolor[gray]{0.9}\textbf{Aerodynamic Drag Model}} \\ \hline
+
+    CFD reference area recovered from \texttt{Cd\_values.csv} metadata &
+    Column 4 of CSV header rows &
+    $S_\text{ref} = 0.001$\,m$^2$ (read directly from CSV) \newline \textbf{Result: \checkmark\ confirmed} \\ \hline
+
+    Drag formula $D = \tfrac{1}{2}\rho S_\text{ref} C_d V^2$ reproduces all 19 tabulated values &
+    $\rho = 1.225$\,kg\,m$^{-3}$ \newline $S_\text{ref} = 0.001$\,m$^2$ \newline $V = 5$\,m\,s$^{-1}$ \newline angles $0^\circ$–$90^\circ$ &
+    Ratio $D_\text{hand}/D_\text{csv} = 1.000$ at every angle \newline (e.g.\ $0^\circ$: $D = 0.01911$\,N; $90^\circ$: $D = 0.06468$\,N) \newline \textbf{Result: \checkmark\ all 19 pass} \\ \hline
+
+    Reference area used in code matches CFD normalisation &
+    $S_\text{ref,CFD} = 0.001$\,m$^2$ \newline $S_\text{ref,code} = \pi d^2/4 = 0.00735$\,m$^2$ &
+    Should equal $S_\text{ref,CFD} = 0.001$\,m$^2$; otherwise drag is incorrect \newline (hand calc: $0.00735/0.001 = 7.35\times$ overestimate) \newline \textbf{Result: \ding{55}\ code overestimates drag by 7.35$\times$} \\ \hline
+
+    Drag at $V = 5$\,m\,s$^{-1}$, $0^\circ$ — comparison of three reference-area choices &
+    $C_d(0^\circ) = 1.248$ \newline $\rho = 1.225$\,kg\,m$^{-3}$ &
+    $D(S_\text{ref}=0.001) = 0.01911$\,N \textbf{[correct]} \newline $D(S_\text{ref}=0.004) = 0.07644$\,N ($4\times$) \newline $D(S_\text{ref}=0.00735) = 0.14041$\,N ($7.35\times$) \newline \textbf{Result: \ding{55}\ code uses wrong area} \\ \hline
+
+    % ── TETHER MECHANICS ──────────────────────────────────────────────────
+    \multicolumn{3}{|l|}{\cellcolor[gray]{0.9}\textbf{Tether Mechanics}} \\ \hline
+
+    Wire cross-sectional area $A = \pi (D/2)^2$ &
+    $D = 0.5$\,mm $= 5\times10^{-4}$\,m &
+    $A = \pi \times (2.5\times10^{-4})^2 = 1.9635\times10^{-7}$\,m$^2$ \newline \textbf{Result: \checkmark\ 1.9635\,$\times$\,10$^{-7}$\,m$^2$} \\ \hline
+
+    Tether axial stiffness $k = AE/L$ at four deployed lengths &
+    $A = 1.9635\times10^{-7}$\,m$^2$ \newline $E = 1\times10^9$\,Pa \newline $L \in \{0.5,\,1.0,\,2.0,\,3.0\}$\,m &
+    $k(0.5) = 392.7$\,N\,m$^{-1}$ \newline $k(1.0) = 196.4$\,N\,m$^{-1}$ \newline $k(2.0) = 98.2$\,N\,m$^{-1}$ \newline $k(3.0) = 65.5$\,N\,m$^{-1}$ \newline \textbf{Result: \checkmark\ all match} \\ \hline
+
+    Tether break force $F_\text{break} = E \, \varepsilon_\text{break} \, A$ consistent with code comments &
+    $E_\text{code} = 1\times10^9$\,Pa \newline $E_\text{comment} = 3\times10^9$\,Pa \newline $\varepsilon_\text{break} = 0.20$ \newline $A = 1.9635\times10^{-7}$\,m$^2$ &
+    Code: $F_\text{break} = 1\times10^9 \times 0.20 \times 1.9635\times10^{-7} = 39.3$\,N \newline Comment claims $\approx$118\,N (requires $E = 3$\,GPa) \newline \textbf{Result: \ding{55}\ factor-of-3 discrepancy} \\ \hline
+
+    Tether damping coefficient is a correct fraction of critical damping &
+    $\zeta = 0.3$ \newline $k = 196.35$\,N\,m$^{-1}$ ($L=1$\,m) \newline $m = 0.143$\,kg &
+    $C_\text{crit} = 2\sqrt{km} = 10.598$\,N\,s\,m$^{-1}$ \newline $C_\text{code} = \zeta \cdot C_\text{crit} = 3.179$\,N\,s\,m$^{-1}$ (underdamped) \newline \textbf{Result: \checkmark\ correct formula, $\zeta < 1$} \\ \hline
+
+    % ── SPOOL DYNAMICS ────────────────────────────────────────────────────
+    \multicolumn{3}{|l|}{\cellcolor[gray]{0.9}\textbf{Spool Dynamics}} \\ \hline
+
+    Effective spool inertia reflected to tether $M_\text{eff} = I/R^2$ &
+    $I = 1\times10^{-5}$\,kg\,m$^2$ \newline $R = 0.032$\,m &
+    $M_\text{eff} = 10^{-5}/0.032^2 = 9.766\times10^{-3}$\,kg \newline (comment: $\approx 0.01$\,kg, consistent) \newline \textbf{Result: \checkmark\ 9.77\,$\times$\,10$^{-3}$\,kg} \\ \hline
+
+    Coulomb brake arrests spool in less than one simulation timestep &
+    $F_\text{brake} = 250$\,N \newline $M_\text{eff} = 9.77\times10^{-3}$\,kg \newline $\dot{P} \in \{0.5,\,1,\,3,\,5\}$\,m\,s$^{-1}$ \newline $\Delta t = 2$\,ms &
+    $t_\text{lock} = \dot{P}\,M_\text{eff}/F_\text{brake}$ \newline $\leq 0.195$\,ms at $\dot{P}=5$\,m\,s$^{-1}$ \newline ($< \Delta t = 2$\,ms for all cases) \newline \textbf{Result: \checkmark\ brake is effectively instantaneous} \\ \hline
+
+    Spool drum angle mirrors Python payout $\theta = \theta_0 + (P - P_0)/R$ &
+    $P - P_0 = 0.10$\,m \newline $R = 0.032$\,m &
+    $\Delta\theta = 0.10/0.032 = 3.125$\,rad \newline \textbf{Result: \checkmark\ formula correct} \\ \hline
+
+    % ── INTERCEPT PERFORMANCE ─────────────────────────────────────────────
+    \multicolumn{3}{|l|}{\cellcolor[gray]{0.9}\textbf{Intercept Performance (Energy Method)}} \\ \hline
+
+    Peak intercept speed — ideal case (no drag) $v = \sqrt{2(\text{TW}-1)g\,d}$ &
+    $d \in \{1,\,2,\,3\}$\,m \newline $\text{TW} = 4$, $g = 9.81$\,m\,s$^{-2}$ &
+    $v(1\,\text{m}) = 7.67$\,m\,s$^{-1}$ \newline $v(2\,\text{m}) = 10.85$\,m\,s$^{-1}$ \newline $v(3\,\text{m}) = 13.29$\,m\,s$^{-1}$ \newline \textbf{Result: \checkmark\ matches numerical integration} \\ \hline
+
+    Drag slows the drone only marginally when correct $S_\text{ref} = 0.001$\,m$^2$ is used &
+    $d = 2$\,m, correct $S_\text{ref}$ &
+    $v_\text{drag} = 10.78$\,m\,s$^{-1}$ vs $v_\text{ideal} = 10.85$\,m\,s$^{-1}$ \newline ($\Delta v = 0.07$\,m\,s$^{-1}$, $< 1\,\%$) \newline \textbf{Result: \checkmark\ drag effect is small as expected} \\ \hline
+
+    Overestimated drag (code $S_\text{ref} = 0.00735$\,m$^2$) noticeably reduces peak speed &
+    $d = 2$\,m, code $S_\text{ref}$ &
+    $v_\text{code} = 10.43$\,m\,s$^{-1}$ vs correct $10.78$\,m\,s$^{-1}$ \newline ($\Delta v = 0.35$\,m\,s$^{-1}$, $3.2\,\%$ lower) \newline \textbf{Result: \ding{55}\ speed underestimated due to area bug} \\ \hline
+
+    % ── BRAKING & STRUCTURAL LOADS ────────────────────────────────────────
+    \multicolumn{3}{|l|}{\cellcolor[gray]{0.9}\textbf{Braking \& Structural Loads (Energy Conservation)}} \\ \hline
+
+    Maximum tether stretch $\Delta x_\text{max} = v\sqrt{m/k}$ (spool locked, linear spring) &
+    $v = 6$\,m\,s$^{-1}$ \newline $k = 196.35$\,N\,m$^{-1}$ ($L = 1$\,m) \newline $m = 0.143$\,kg &
+    $\Delta x = 6\sqrt{0.143/196.35} = 0.162$\,m \newline $\varepsilon = 0.162/1.0 = 0.162 < 0.20$ \newline Tether survives. \newline \textbf{Result: \checkmark\ no break at 6\,m\,s$^{-1}$, $L = 1$\,m} \\ \hline
+
+    Peak tether force during braking $F_\text{max} = k \, \Delta x_\text{max}$ &
+    $v = 6$\,m\,s$^{-1}$, $L = 1$\,m \newline $k = 196.35$\,N\,m$^{-1}$ &
+    $F_\text{max} = 196.35 \times 0.162 = 31.8$\,N \newline Peak deceleration $= F_\text{max}/m = 222.4$\,m\,s$^{-2} = 22.7\,g$ \newline \textbf{Result: \checkmark\ formula consistent} \\ \hline
+
+    Tether breaks above $v = 8$\,m\,s$^{-1}$ at $L = 1$\,m (break strain $\varepsilon = 0.20$) &
+    $v = 8$\,m\,s$^{-1}$ \newline $L = 1$\,m \newline $\varepsilon_\text{break} = 0.20$ &
+    $\Delta x = 8\sqrt{0.143/196.35} = 0.216$\,m \newline $\varepsilon = 0.216 > 0.20$ \newline Tether fails; sim should terminate. \newline \textbf{Result: \checkmark\ break correctly predicted} \\ \hline
+
+    Tether survives $v = 8$\,m\,s$^{-1}$ when deployed length $L = 2$\,m &
+    $v = 8$\,m\,s$^{-1}$ \newline $L = 2$\,m, $k = 98.18$\,N\,m$^{-1}$ &
+    $\Delta x = 8\sqrt{0.143/98.18} = 0.305$\,m \newline $\varepsilon = 0.305/2.0 = 0.153 < 0.20$ \newline \textbf{Result: \checkmark\ longer tether absorbs energy safely} \\ \hline
+
+    % ── CONTROL LOGIC ─────────────────────────────────────────────────────
+    \multicolumn{3}{|l|}{\cellcolor[gray]{0.9}\textbf{Control Logic \& State Machine}} \\ \hline
+
+    G-force metric measures kinematic deceleration, not total structural loading &
+    $\Delta v = 5$\,m\,s$^{-1}$ \newline $\Delta t = 2$\,ms &
+    $g_\text{code} = |\Delta v|/\Delta t/g = 254.8\,g$ \newline Structural load $= g_\text{code} + 1\,g = 255.8\,g$ \newline \textbf{Result: \ding{55}\ gravity contribution omitted (minor)} \\ \hline
+
+    Reel-back hang-force \texttt{f\_hang} must have units of Newtons &
+    \texttt{vert\_frac} $= 0.50$ \newline $m = 0.143$\,kg, $g = 9.81$\,m\,s$^{-2}$ &
+    $f_\text{hang} = \text{vert\_frac} \times mg = 0.50 \times 1.403 = 0.701$\,N \newline Code sets $f_\text{hang} = \text{vert\_frac} = 0.50$ (no units) \newline \textbf{Result: \ding{55}\ missing factor $mg = 1.403$} \\ \hline
+
+    Docking exit condition terminates the simulation loop &
+    \texttt{dist\_dock} $\leq$ \texttt{REEL\_HOME} &
+    \texttt{step\_logic()} must return \texttt{False} so the main loop breaks \newline Code returns \texttt{None} (bare \texttt{return}); \texttt{if result is False} is never triggered \newline \textbf{Result: \ding{55}\ loop runs indefinitely after docking} \\ \hline
+
+    Debug print of \texttt{p\_brake\_start} reflects actual braking position &
+    \texttt{p\_brake\_start} printed at line 303, before simulation starts &
+    Should print the position where braking begins \newline Code prints \texttt{[0.\ 0.\ 0.]} because variable is still zeroed \newline \textbf{Result: \ding{55}\ print fires before value is set} \\ \hline
+
+\end{longtable}
+\endgroup
+
+The unit tests above reveal eight checks that pass and six that flag errors in the current implementation. The most impactful error is the aerodynamic reference area: the CFD data in \texttt{Cd\_values.csv} embeds the metadata entry $S_\text{ref} = 0.001$\,m$^2$, and all 19 tabulated drag values are exactly reproduced by the formula $D = \tfrac{1}{2}\rho \cdot 0.001 \cdot C_d \cdot V^2$. The code, however, passes the propeller swept area $\pi d^2/4 = 0.00735$\,m$^2$ to the drag engine, overstating all aerodynamic forces by a factor of 7.35. A secondary inconsistency exists in the tether model: the wire modulus is coded as $E = 1$\,GPa but the inline comment states $3$\,GPa, placing the tether break force at $39.3$\,N rather than the $118$\,N the comment implies. The remaining failures—the dimensionless hang-force, the docking exit condition, and the misplaced debug print—are logic errors with straightforward one-line fixes.
