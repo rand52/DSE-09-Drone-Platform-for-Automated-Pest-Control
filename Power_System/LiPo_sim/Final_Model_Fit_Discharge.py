@@ -7,7 +7,7 @@ from sklearn.metrics import root_mean_squared_error
 
 
 # Loading Data
-battery_csv_path = r"C:\Users\spash\OneDrive\Desktop\Uni\Bachelor\Year 3\DSE\DSE Code\DSE-09-Drone-Platform-for-Automated-Pest-Control\Power_System\CSV files\0_Discharge_std_3.csv"
+battery_csv_path = r"C:\Users\spash\OneDrive\Desktop\Uni\Bachelor\Year 3\DSE\DSE Code\DSE-09-Drone-Platform-for-Automated-Pest-Control\Power_System\CSV files\0_Discharge_stress_3.csv"
 battery_data = np.loadtxt(battery_csv_path, delimiter="\t")
 extracted_charge_linreg = battery_data[:,0]
 voltage_linreg = battery_data[:,1]

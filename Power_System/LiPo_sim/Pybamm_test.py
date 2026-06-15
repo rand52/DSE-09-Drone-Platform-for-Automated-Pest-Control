@@ -4,14 +4,14 @@ import pybamm
 
 if __name__ == "__main__":
     # ── Flight & Power Parameters (matching your function defaults) ───────────────
-    P_max_input  = 326      # W (propeller shaft)
-    P_avg_input  = 130.4      # W (propeller shaft)
+    P_max_input  = 320      # W (propeller shaft)
+    P_avg_input  = 130     # W (propeller shaft)
     t_flight     = 10       # s
 
     P_max = P_max_input / 0.95   # electrical draw
     P_avg = P_avg_input / 0.95
 
-    t_p_max          = 4        # duration of peak power [s]
+    t_p_max          = 3        # duration of peak power [s]
     t_t_p_max_frac   = 0        # start of peak as fraction of flight
 
     # ── Precompute the spool-lagged power profile (your exact loop logic) ─────────
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     param["Power function [W]"]           = P_interpolant
 
     # ── Simulation ────────────────────────────────────────────────────────────────
-    initial_soc = 0.8
+    initial_soc = 0.65
 
     sim = pybamm.Simulation(
         model,
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     t_out    = sol["Time [s]"].entries
     V_cell   = sol["Terminal voltage [V]"].entries
     I_cell   = sol["Current [A]"].entries
-    capacity_Ah      = 0.32
+    capacity_Ah      = param["Nominal cell capacity [A.h]"]
     discharge_cap    = sol["Discharge capacity [A.h]"].entries
     soc              = initial_soc - (discharge_cap / capacity_Ah)
 
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     P_pack   = V_pack * I_pack
 
     # ── Recharge Time (matching your calculation) ─────────────────────────────────
-    initial_charge_soc = 0.8
+    initial_charge_soc = initial_soc
     charging_rate      = 2
     DoD                = initial_charge_soc - soc[-1]
     recharge_time      = DoD * 3600 / charging_rate

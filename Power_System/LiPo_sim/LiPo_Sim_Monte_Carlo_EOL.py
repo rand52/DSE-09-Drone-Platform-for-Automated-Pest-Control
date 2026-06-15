@@ -27,34 +27,34 @@ def Vocv_poly(x):
 def R_eff_poly(x):
      return intercept_res + coef_res[0] * x
 
-def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
+def LiPo_sim (P_max_mot=320,P_avg_mot=130,t_flight=10):
     '''--------Monte Carlo-----------'''
-    Number_Monte_carlo_runs = 5000
+    Number_Monte_carlo_runs = 100
     fail_cycles = np.full(Number_Monte_carlo_runs,np.nan)
-
+    V_min = []
+    Monte_Carlo_to_display = Number_Monte_carlo_runs/2 # Cycle to display in detail
     '''------------Battery Parameters To Enter For Each Battery----------------'''
-    Monte_Carlo_to_display = 1667 # Cycle to display in detail
-    number_of_cycles_to_simulate = 500
-    R_eff_initial_cycle_0 = 0.018 # Initial condition for internal resistance
+    number_of_cycles_to_simulate = 1500
+    R_eff_initial_cycle_0 = 0.015 # Initial condition for internal resistance
     num_cells = 4 # Number of cells in the batetry
     nominal_battery_capacity_Ah = 0.32 # Assumed capacity of battery [Ah]
-    avg_DoD = 0.14 # Average DoD that the battery will have as a fraction
+    avg_DoD = 0.17 # Average DoD that the battery will have as a fraction
     max_c_rate = 95 # Max C rate of battery
 
     t_p_max = 3 # Time at max power [s]
     t_t_p_max_frac = 0 # Temporal location of the start of peak power as % of total fight
 
-    initial_charge_soc = 0.65 # SOC to which we maximum charge
+    initial_charge_soc = 0.75 # SOC to which we maximum charge
     charging_rate = 2 # C-Rate for charging
 
     '''------------Additional Battery Parameters----------------'''
 
-    P_max = P_max_mot / 0.95 # Assuming that propellers draw 80% of the power 
-    P_avg = P_avg_mot / 0.95 # Assuming that propellers draw 80% of the power
+    P_max = P_max_mot / 0.95 # Assuming that propellers draw 95% of the power 
+    P_avg = P_avg_mot / 0.80 # Assuming that propellers draw 95% of the power
 
     '''---------------Additional Time calculations/parameters-------------------'''
 
-        # Params
+    # Params
     dt = 0.01  # Timestep size [s]
     tau_up = 0.1   # spool up faster, how fast motors spool up
     tau_down = 0.6 # spool down slower, how fast motors spool down
@@ -68,7 +68,7 @@ def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
     for run in range(Number_Monte_carlo_runs):
 
         '''------------Monte Carlo Simulation---------------'''
-        mean = 0.00704
+        mean = 0.003225333
         c = np.random.normal(mean,0.1*mean)
         
         
@@ -78,20 +78,20 @@ def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
         number_of_equiv_cycles = number_of_cycles * avg_DoD * 1.5 # Equivalent actual full cycles the battery has gone through
         
     # Degradation Model
-        degradation_frac = 1.085 - 0.085 * np.exp(c*number_of_equiv_cycles) # VECTOR for each cycle
+        degradation_frac = 1.185202 - 0.203385 * np.exp(c*number_of_equiv_cycles) # VECTOR for each cycle
         battery_capacity = nominal_battery_capacity_Ah * degradation_frac * 3600 # VECTOR Battery Capacity in Amp_secs for calculation
         battery_capacity_Ah = battery_capacity / 3600 # VECTOR
         initial_charge = battery_capacity * initial_charge_soc # VECTOR
-
+        
         # Resistance degradation
-        R_eff_initial = r0_growth_factor(number_of_equiv_cycles) * R_eff_initial_cycle_0
+        R_eff_initial = r0_growth_factor(number_of_equiv_cycles) * R_eff_initial_cycle_0 # Aging
         '''------------Initializing Battery Performance Arrays----------------'''
 
         C_rate_arr = np.zeros((number_of_cycles_to_simulate,len(t)))
         I_arr = np.zeros((number_of_cycles_to_simulate,len(t)))
         V_arr = np.empty((number_of_cycles_to_simulate,len(t)))
         soc_arr = np.zeros((number_of_cycles_to_simulate,len(t)))
-
+        V_ocv_arr = np.empty((number_of_cycles_to_simulate,len(t)))
         '''--------------Battery Performance Calculations------------------'''
 
         used_charge = 0.0 # Initialise used charge for calculation [As]
@@ -122,15 +122,16 @@ def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
 
             #---------Quick Check--------------------
             max_power_possible = (V_ocv_pack ** 2) / (4*R_pack)
-            fail_mask = P_target > max_power_possible
+            fail_mask = P_delivered > max_power_possible
             if fail_mask.any():
-                #print("Demanded Power: ", P_target, "Max Power Possible: ", max_power_possible)
-                idx_fail = np.where(fail_mask)[0][0]  # first failing index
+                failing_cycles = np.where(fail_mask)[0]
+                idx_fail = failing_cycles.min()
                 print(f"Power demand not feasible at t = {time}, cycle = {idx_fail}")
-                fail_cycles[run] = idx_fail
-                break
+                if idx_fail <= fail_cycles[run] or np.isnan(fail_cycles[run]):
+                    fail_cycles[run] = idx_fail
             #------------End------------------------
             disc = V_ocv_pack**2 - 4 * R_pack * P_delivered
+            disc = np.maximum(disc, 0.0)
             I_drawn  = (V_ocv_pack - np.sqrt(disc)) / (2*R_pack)
             V_delivered = V_ocv_pack - I_drawn*R_pack
 
@@ -143,18 +144,19 @@ def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
             soc_arr[:,idx] = battery_soc
             V_arr[:,idx] = V_delivered
             I_arr[:,idx] = I_drawn
-
+            V_ocv_arr[:,idx] = V_ocv_pack
+        V_min.append(np.min(V_arr))
         '''--------Fail Cycle detection---------'''
-        fail_mask = ((C_rate_arr > 0.95 * max_c_rate) |(V_arr < 2.75 * 4))
-        fail_per_cycle = fail_mask.any(axis=1)
+        fail_mask_2 = V_ocv_arr < 2.75 * 4
+        fail_per_cycle = fail_mask_2.any(axis=1)
         fail_cycle_indices = np.where(fail_per_cycle)[0]
 
         if len(fail_cycle_indices) > 0:
             fail_cycle = fail_cycle_indices[0]
         else:
-            fail_cycle = number_of_cycles_to_simulate - 1  # no failure found
+            fail_cycle = number_of_cycles_to_simulate - 1
         
-        if np.isnan(fail_cycles[run]):
+        if (np.isnan(fail_cycles[run]) or fail_cycle < fail_cycles[run]):
             fail_cycles[run] = fail_cycle
                 
         if Monte_Carlo_to_display == run:
@@ -165,8 +167,9 @@ def LiPo_sim (P_max_mot=326,P_avg_mot=130.4,t_flight=10):
             C_rate_plotting = C_rate_arr[plot_idx,:]
             DoD = initial_charge_soc - soc_arr[plot_idx,-1]
             recharge_time = (DoD) * 3600 / charging_rate
-
-    return I_plotting, Soc_plotting, V_plotting, C_rate_plotting, recharge_time, fail_cycles, t
+    V_min_min = np.min(V_min)
+    print(fail_cycles)
+    return I_plotting, Soc_plotting, V_plotting, C_rate_plotting, recharge_time, fail_cycles, t, V_min_min
 
    
 
@@ -177,11 +180,13 @@ if __name__ == "__main__":
     '''---------------Main Function------------------'''
     start = time.perf_counter()
     
-    I_plot, Soc_plot, V_plot, C_rate_plot, recharge_time, fail_cycles, time_vec = LiPo_sim()
+    I_plot, Soc_plot, V_plot, C_rate_plot, recharge_time, fail_cycles, time_vec, Minimum_Voltage = LiPo_sim()
     
     end = time.perf_counter()
 
     print("Runtime:", end - start, "seconds")
+
+    print("Absolute Minimum Voltage [V]:", Minimum_Voltage)
 
     mean_cycles = np.average(fail_cycles)
     std_cycles = np.std(fail_cycles)
@@ -190,7 +195,7 @@ if __name__ == "__main__":
     std_mean = np.sqrt(var_mean)
 
 
-    print("Cycle Distribution (", mean_cycles,",",std_cycles ** 2,")")
+    print("Cycle Distribution N(", mean_cycles,",",std_cycles ** 2,")")
     print("Standard Error of the mean: ", std_mean)
 
     lower_lim_95_percent = mean_cycles - 2.57 * std_cycles
@@ -203,31 +208,38 @@ if __name__ == "__main__":
 
     '''---------------Plotting------------------'''
 
-    fig,ax = plt.subplots(2,2,figsize=(9,5))
-
-    ax[0,0].plot(time_vec, V_plot, color='Steelblue', linewidth=2, label="Total Pack Voltage")
-    ax[0,0].plot(time_vec, V_plot/4, color='Darkorange', linewidth=2, label="Cell Voltage")
-    ax[0,0].axhline(y=2.75, color='Tomato', linestyle='--', linewidth=2, label="Cell Cutoff Voltage")
-    ax[1,0].plot(time_vec, C_rate_plot, color='Steelblue', linewidth=2)
-    ax[0,1].plot(time_vec, I_plot, color='Steelblue', linewidth=2)
-    ax[1,1].plot(time_vec, Soc_plot, color='Steelblue', linewidth=2)
-
-    ax[0,0].set_xlabel('Time (s)')
-    ax[0,0].set_ylabel('Voltage (V)')
-
-    ax[1,0].set_xlabel('Time (s)')
-    ax[1,0].set_ylabel('C rate (1/h)')
-
-    ax[0,1].set_xlabel('Time (s)')
-    ax[0,1].set_ylabel('Current (A)')
-
-    ax[1,1].set_xlabel('Time (s)')
-    ax[1,1].set_ylabel('State of Charge (%)')
-
-    ax[0,0].legend()
-
+    # Figure 1: Voltage
+    plt.figure()
+    plt.plot(time_vec, V_plot, color='Steelblue', linewidth=2)
+    plt.xlabel('Time (s)')
+    plt.ylabel('Voltage (V)')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
+
+    # Figure 2: Current
+    plt.figure()
+    plt.plot(time_vec, I_plot, color='Steelblue', linewidth=2)
+    plt.xlabel('Time (s)')
+    plt.ylabel('Current (A)')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    # Figure 3: C rate
+    plt.figure()
+    plt.plot(time_vec, C_rate_plot, color='Steelblue', linewidth=2)
+    plt.xlabel('Time (s)')
+    plt.ylabel('C rate (1/h)')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    # Figure 4: State of Charge
+    plt.figure()
+    plt.plot(time_vec, Soc_plot, color='Steelblue', linewidth=2)
+    plt.xlabel('Time (s)')
+    plt.ylabel('State of Charge (%)')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+
     plt.show()
 
 
