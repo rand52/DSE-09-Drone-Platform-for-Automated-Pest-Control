@@ -19,7 +19,7 @@ Moth_Log = r"Flight_Performance_Simulation\\files\\log_itrk3.csv"
 
 
 # Drone parameters
-Drone_Mass = 0.143 #kg
+Drone_Mass = 0.150 #kg
 TW_ratio = 4#Thrust to weight ratio
 Max_Thrust = Drone_Mass*TW_ratio*9.81 #newtons
 diameter = 96.72 * 10**-3
@@ -28,17 +28,17 @@ Drone_area = (math.pi*diameter**2)/4 #m^2 TODO:
 Drone_pitch_rate = 30 # degrees/s
 SLACK_MARGIN = 0.03
 Capture_Radius = 0.18 #meter TODO: check if neccesary
-F_brake = 250 # N  max tether force the spool brake can hold before it slips (Coulomb).
-BRAKE_RAMP = 0.01 #seconds  time to ramp the brake from 0 to full
+F_brake = 142 # N  max tether force thSe spool brake can hold before it slips (Coulomb).
+BRAKE_RAMP = 0.03 #seconds  time to ramp the brake from 0 to full
 Spool_pos = [0,0,0]
 # Tether axial damping. C_TAUT is recomputed each step as a fraction of critical damping
 # (C = 2*ZETA*sqrt(k*m)); ZETA < 1 -> underdamped. Tune ZETA once we have a target response.
 C_TAUT = 0.0   # recomputed every step in step_logic()
-ZETA   = 0.3   # tether damping ratio (underdamped placeholder — TODO tune)
+ZETA   = 0.02   # tether damping ratio (underdamped placeholder — TODO tune)
 
 # Wire properties for length-dependent stiffness k = AE/L
 WIRE_DIAMETER    = 0.0005                                # m  (0.5 mm — verify)
-WIRE_E           = 1e9                                   # Pa (Nylon, 3 GPa — verify from datasheet)
+WIRE_E           = 2e9                                   # Pa (Nylon, 3 GPa — verify from datasheet)
 WIRE_A           = math.pi * (WIRE_DIAMETER / 2) ** 2    # m^2 cross-section area
 
 # ------------------------------------------------------------------------------------------
@@ -48,14 +48,14 @@ WIRE_A           = math.pi * (WIRE_DIAMETER / 2) ** 2    # m^2 cross-section are
 #       m_eff * Pddot = T - F_brake - F_reel          (P = deployed tether length)
 # Reflected inertia felt by the drone = I_SPOOL / R_SPOOL**2 -> keep << Drone_Mass.
 # ------------------------------------------------------------------------------------------
-R_SPOOL = 0.032                         # m   spool drum radius (== drum_geom radius in chameleon.xml)
-I_SPOOL = 1e-5                          # kg*m^2  spool rotational inertia (reflected ~0.01 kg << drone)
+R_SPOOL = 0.035                         # m   spool drum radius (== drum_geom radius in chameleon.xml)
+I_SPOOL = 0.0001376                          # kg*m^2  spool rotational inertia (reflected ~0.01 kg << drone)
 M_EFF   = I_SPOOL / R_SPOOL**2          # kg  effective payout inertia reflected to the tether
 
 # Tether failure: nylon snaps near ~20% strain. With WIRE_E=3 GPa that is a break stress of
 # E*eps = 600 MPa -> break force ~ stress*WIRE_A ~ 118 N, in line with real 0.5 mm nylon mono.
 # To target a specific break force instead: BREAK_STRAIN = break_force / (WIRE_E * WIRE_A).
-BREAK_STRAIN      = 0.20                                 # -  engineering strain at which the tether breaks
+BREAK_STRAIN      = 0.35                          # -  engineering strain at which the tether breaks
 HARD_LIMIT_MARGIN = 0.5                                  # m  solver limit backstop (never reached: break fires first)
 
 #Reel in settings

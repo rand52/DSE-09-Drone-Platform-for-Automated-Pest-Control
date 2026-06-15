@@ -29,7 +29,7 @@ M_EFF           = I_SPOOL / R_SPOOL**2
 ZETA            = 0.3
 INTERCEPT, BRAKE = 0, 1
 
-MAX_G    = 30.0   # g
+MAX_G    = 26.0   # g
 MAX_DIST = 0.6    # m
 
 
@@ -320,10 +320,10 @@ def plot_results(all_results, moduli_gpa, diameters_mm):
 
 
 def run_constrained_optimization():
-    moduli_gpa    = [0.3, 0.5, 1.0, 1.5, 2.0, 3.0]
-    diameters_mm  = [0.2, 0.3, 0.4, 0.5, 0.6, 0.8]
+    moduli_gpa    = [1.0]
+    diameters_mm  = [0.5]
     # Wide log-spaced brake force range: 5 N → 500 N
-    brake_forces  = np.logspace(np.log10(5), np.log10(500), 25).tolist()
+    brake_forces  = np.logspace(np.log10(5), np.log10(100), 25).tolist()
     ramp_times    = [0.01, 0.05, 0.1]
 
     all_results = []
