@@ -40,7 +40,7 @@ ZETA   = 0.02   # tether damping ratio (underdamped placeholder — TODO tune)
 WIRE_DIAMETER    = 0.0005                                # m  (0.5 mm — verify)
 WIRE_E           = 2e9                                   # Pa (Nylon, 3 GPa — verify from datasheet)
 WIRE_A           = math.pi * (WIRE_DIAMETER / 2) ** 2    # m^2 cross-section area
-WIRE_ETA           = 0.1
+#WIRE_ETA           = 0.1
 
 # ------------------------------------------------------------------------------------------
 # Spool payout model (Python).  R_SPOOL is the single design knob; if the drum is redesigned
@@ -163,7 +163,7 @@ def main():
         Ldot     = float(data.ten_velocity[tid])
         k_spring = (WIRE_A * WIRE_E) / max(L, 1e-3)   # update stiffness: k = AE/L
         model.tendon_stiffness[tid] = k_spring
-        #C_TAUT = 2.0 * ZETA * math.sqrt(k_spring * Drone_Mass)  # fraction of critical damping
+        C_TAUT = 2.0 * ZETA * math.sqrt(k_spring * Drone_Mass)  # fraction of critical damping
         # Calculate C directly from the material viscosity, area, and length
         C_TAUT = (WIRE_A * WIRE_ETA) / L
         moth_p = moth.position(t)

@@ -18,10 +18,10 @@ DROP_HEIGHT = 4.8          # m (Vrije val, Fall factor ~1.71)
 WIRE_DIAMETER = 0.0089     # m (8.9 mm Edelrid Swift)
 WIRE_E = 0.42e9             # Pa (Dynamische modulus Nylon 6, ~2.5 GPa)
 WIRE_A = math.pi * (WIRE_DIAMETER / 2) ** 2
-WIRE_ETA=0.1
+#WIRE_ETA=0.1e9
 
 # Demping ratio
-ZETA = 0.1 
+ZETA = 0.02 
 
 def main():
     model = mujoco.MjModel.from_xml_path(XML_PATH)
@@ -67,7 +67,8 @@ def main():
             
             if stretch > 0.0:
                 spring = k_spring * stretch
-                c_taut = (WIRE_A * WIRE_ETA) / L
+                c_taut = 2.0 * ZETA * math.sqrt(k_spring * MASS)
+                #c_taut = (WIRE_A * WIRE_ETA) / ROPE_LENGTH
                 
                 tension = max(0.0, spring + c_taut * Ldot)
                 
