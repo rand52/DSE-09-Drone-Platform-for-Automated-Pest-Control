@@ -61,7 +61,7 @@
             <freejoint name="drone_free"/>
             <!--UPDATE THIS ENTIRE PART WHEN SIZING IS IN-->
             <!--Hollow-Cylinder Inertia (m=0.143, R= 0.0405, r=0.029, h=0.08)-->
-            <inertial pos="0 0 0" mass="0.143" diaginertia="0.000226 0.000189 0.000189"/>
+            <inertial pos="0 0 0" mass="0.160" diaginertia="0.000116419 0.000121242 0.000128358"/>
             <!--Duct Wall-->
             <geom name="duct_geom" type="cylinder" size="0.0405 0.04" euler="0 90 0" rgba="0.20 0.50 0.85 1"/>
             <!--Counter-Rotating propeller disc, only for visual, deleted if we have CAD model-->

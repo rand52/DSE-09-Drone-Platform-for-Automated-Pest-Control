@@ -19,7 +19,7 @@ Moth_Log = r"Flight_Performance_Simulation\\files\\log_itrk3.csv"
 
 
 # Drone parameters
-Drone_Mass = 0.150 #kg
+Drone_Mass = 0.160 #kg
 TW_ratio = 4#Thrust to weight ratio
 Max_Thrust = Drone_Mass*TW_ratio*9.81 #newtons
 diameter = 96.72 * 10**-3
@@ -40,6 +40,7 @@ ZETA   = 0.02   # tether damping ratio (underdamped placeholder — TODO tune)
 WIRE_DIAMETER    = 0.0005                                # m  (0.5 mm — verify)
 WIRE_E           = 2e9                                   # Pa (Nylon, 3 GPa — verify from datasheet)
 WIRE_A           = math.pi * (WIRE_DIAMETER / 2) ** 2    # m^2 cross-section area
+WIRE_ETA           = 0.1
 
 # ------------------------------------------------------------------------------------------
 # Spool payout model (Python).  R_SPOOL is the single design knob; if the drum is redesigned
@@ -55,11 +56,11 @@ M_EFF   = I_SPOOL / R_SPOOL**2          # kg  effective payout inertia reflected
 # Tether failure: nylon snaps near ~20% strain. With WIRE_E=3 GPa that is a break stress of
 # E*eps = 600 MPa -> break force ~ stress*WIRE_A ~ 118 N, in line with real 0.5 mm nylon mono.
 # To target a specific break force instead: BREAK_STRAIN = break_force / (WIRE_E * WIRE_A).
-BREAK_STRAIN      = 0.35                          # -  engineering strain at which the tether breaks
+BREAK_STRAIN      = 0.2                          # -  engineering strain at which the tether breaks
 HARD_LIMIT_MARGIN = 0.5                                  # m  solver limit backstop (never reached: break fires first)
 
 #Reel in settings
-REEL_SPEED     = 3       # reel-in target speed [m/s]
+REEL_SPEED     = 3.5       # reel-in target speed [m/s]
 REEL_KP        = 6.0        # reel velocity-servo gain [N/(m/s)]
 REEL_FORCE_MAX = 50.0       # max reel pull force [N] 
 REEL_HOME      = 0.30
@@ -125,6 +126,8 @@ def main():
 
     drone_pos0  = data.xpos[bid].copy() #Initial drone position
     moth.start_pos[2] += 1.5
+    #moth.start_pos[1] = 3
+    #moth.start_pos[0] = 3
     to_moth     = moth.start_pos - drone_pos0 #Vector from drone to moth
     print(moth.start_pos)
     print(to_moth)
@@ -160,9 +163,13 @@ def main():
         Ldot     = float(data.ten_velocity[tid])
         k_spring = (WIRE_A * WIRE_E) / max(L, 1e-3)   # update stiffness: k = AE/L
         model.tendon_stiffness[tid] = k_spring
-        C_TAUT = 2.0 * ZETA * math.sqrt(k_spring * Drone_Mass)  # fraction of critical damping
+        #C_TAUT = 2.0 * ZETA * math.sqrt(k_spring * Drone_Mass)  # fraction of critical damping
+        # Calculate C directly from the material viscosity, area, and length
+        C_TAUT = (WIRE_A * WIRE_ETA) / L
         moth_p = moth.position(t)
         moth_p[2] += 1.5 
+        #moth_p[1]= 3
+        #moth_p[0] = 3
 
         data.mocap_pos[moth_mid] = moth_p
 
