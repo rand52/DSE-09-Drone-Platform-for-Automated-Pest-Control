@@ -28,7 +28,7 @@ Drone_area = (math.pi*diameter**2)/4 #m^2 TODO:
 Drone_pitch_rate = 30 # degrees/s
 SLACK_MARGIN = 0.03
 Capture_Radius = 0.18 #meter TODO: check if neccesary
-F_brake = 142 # N  max tether force thSe spool brake can hold before it slips (Coulomb).
+F_brake = 100 # N  max tether force thSe spool brake can hold before it slips (Coulomb).
 BRAKE_RAMP = 0.03 #seconds  time to ramp the brake from 0 to full
 Spool_pos = [0,0,0]
 # Tether axial damping. C_TAUT is recomputed each step as a fraction of critical damping
@@ -165,7 +165,7 @@ def main():
         model.tendon_stiffness[tid] = k_spring
         C_TAUT = 2.0 * ZETA * math.sqrt(k_spring * Drone_Mass)  # fraction of critical damping
         # Calculate C directly from the material viscosity, area, and length
-        C_TAUT = (WIRE_A * WIRE_ETA) / L
+        # C_TAUT = (WIRE_A * WIRE_ETA) / L
         moth_p = moth.position(t)
         moth_p[2] += 1.5 
         #moth_p[1]= 3

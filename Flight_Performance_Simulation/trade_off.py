@@ -15,7 +15,7 @@ from controller import FlightController
 Model_path = r"Flight_Performance_Simulation\chameleon.xml"
 Moth_Log   = r"Flight_Performance_Simulation\files\log_itrk3.csv"
 
-Drone_Mass   = 0.143
+Drone_Mass   = 0.160
 TW_ratio     = 4
 Max_Thrust   = Drone_Mass * TW_ratio * 9.81
 diameter     = 96.72e-3
@@ -23,13 +23,13 @@ Drone_area   = (math.pi * diameter**2) / 4   # ~0.00735 m²
 
 SLACK_MARGIN    = 0.03
 Capture_Radius  = 0.18
-R_SPOOL         = 0.032
-I_SPOOL         = 1e-5
+R_SPOOL         = 0.035
+I_SPOOL         = 1e-4
 M_EFF           = I_SPOOL / R_SPOOL**2
-ZETA            = 0.3
+ZETA            = 0.02
 INTERCEPT, BRAKE = 0, 1
 
-MAX_G    = 26.0   # g
+MAX_G    = 35.0   # g
 MAX_DIST = 0.6    # m
 
 
@@ -320,8 +320,8 @@ def plot_results(all_results, moduli_gpa, diameters_mm):
 
 
 def run_constrained_optimization():
-    moduli_gpa    = [1.0]
-    diameters_mm  = [0.5]
+    moduli_gpa    = [0.5, 1.0, 2.0, 3.0]
+    diameters_mm  = [0.5, 1, 2]
     # Wide log-spaced brake force range: 5 N → 500 N
     brake_forces  = np.logspace(np.log10(5), np.log10(100), 25).tolist()
     ramp_times    = [0.01, 0.05, 0.1]

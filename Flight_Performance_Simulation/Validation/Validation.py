@@ -21,7 +21,7 @@ WIRE_A = math.pi * (WIRE_DIAMETER / 2) ** 2
 #WIRE_ETA=0.1e9
 
 # Demping ratio
-ZETA = 0.02 
+ZETA = 0.02
 
 def main():
     model = mujoco.MjModel.from_xml_path(XML_PATH)
