@@ -15,6 +15,7 @@ class MothTrajectory:
     CHANGE 1: First iteration for the code made
     CHANGE 2: Pandas used for faster file loading
     CHANGE 3: Max can you see this yes
+    CHANGE 4: Maintained Z-down positive convention and implemented 3m camera offset.
     """
     def __init__(self, path: str, require_valid: bool = True, smoothed: bool = True ) -> None:
         # Check whether smoothed is used 
@@ -38,6 +39,7 @@ class MothTrajectory:
         #of course we want more but we want to stop here otherwise the code might crash
         if len(df)<2:
             raise ValueError(f"Not enough valid moth positions in {path}")
+            
         #sort chronologically
         df=df.sort_values(by="elapsed")
         
@@ -49,16 +51,16 @@ class MothTrajectory:
         self.start_pos = self.pos[0].copy()
         self.end_pos = self.pos[-1].copy()
 
-    def position(self, t: float) ->np.ndarray:
+    def position(self, t: float) -> np.ndarray:
         """
         Moth position will be interpolated between time intervals, 
         tc makes sure time can continue outside if mujoco continues for longer
         Prevents framerate mismatch
         """
-        tc= float(np.clip(t, 0.0, self.duration))
+        tc = float(np.clip(t, 0.0, self.duration))
         return np.array([np.interp(tc, self.t, self.pos[:,k]) for k in range(3)])
 
-    def velocity(self, t: float) ->np.ndarray:
+    def velocity(self, t: float) -> np.ndarray:
         """
         Same goes for the velocity
         """

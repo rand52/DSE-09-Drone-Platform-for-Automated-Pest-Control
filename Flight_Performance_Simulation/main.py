@@ -28,7 +28,7 @@ Drone_area = (math.pi*diameter**2)/4 #m^2 TODO:
 Drone_pitch_rate = 30 # degrees/s
 SLACK_MARGIN = 0.03
 Capture_Radius = 0.18 #meter TODO: check if neccesary
-F_brake = 100 # N  max tether force thSe spool brake can hold before it slips (Coulomb).
+F_brake = 150 # N  max tether force thSe spool brake can hold before it slips (Coulomb).
 BRAKE_RAMP = 0.03 #seconds  time to ramp the brake from 0 to full
 Spool_pos = [0,0,0]
 # Tether axial damping. C_TAUT is recomputed each step as a fraction of critical damping
@@ -60,13 +60,13 @@ BREAK_STRAIN      = 0.2                          # -  engineering strain at whic
 HARD_LIMIT_MARGIN = 0.5                                  # m  solver limit backstop (never reached: break fires first)
 
 #Reel in settings
-REEL_SPEED     = 3.5       # reel-in target speed [m/s]
+REEL_SPEED     = 3       # reel-in target speed [m/s]
 REEL_KP        = 6.0        # reel velocity-servo gain [N/(m/s)]
 REEL_FORCE_MAX = 50.0       # max reel pull force [N] 
 REEL_HOME      = 0.30
 
 
-SLOW_MO  = 8    # 1.0 = real time, 4.0 = 4x slower, 0.5 = 2x faster
+SLOW_MO  = 25    # 1.0 = real time, 4.0 = 4x slower, 0.5 = 2x faster
 
 INTERCEPT, BRAKE, REEL = 0, 1, 2
 STATE_NAMES = {INTERCEPT: "INTERCEPT", BRAKE: "BRAKE", REEL: "REEL"}
