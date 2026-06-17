@@ -125,9 +125,9 @@ def main():
     model.tendon_lengthspring[tid] = [0.0, P] # models the initial length of the tether
 
     drone_pos0  = data.xpos[bid].copy() #Initial drone position
-    moth.start_pos[2] += 1.5
-    moth.start_pos[1] = 3
-    moth.start_pos[0] = 3
+    moth.start_pos[2] += 0.5
+    moth.start_pos[1] = 0
+    moth.start_pos[0] = 0
     to_moth     = moth.start_pos - drone_pos0 #Vector from drone to moth
     print(moth.start_pos)
     print(to_moth)
@@ -167,9 +167,9 @@ def main():
         # Calculate C directly from the material viscosity, area, and length
         # C_TAUT = (WIRE_A * WIRE_ETA) / L
         moth_p = moth.position(t)
-        moth_p[2] += 1.5 
-        moth_p[1]= 3
-        moth_p[0] = 3
+        moth_p[2] += 0.5
+        moth_p[1]= 0
+        moth_p[0] = 0
 
         data.mocap_pos[moth_mid] = moth_p
 
