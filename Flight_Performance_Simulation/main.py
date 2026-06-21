@@ -66,7 +66,7 @@ REEL_FORCE_MAX = 50.0       # max reel pull force [N]
 REEL_HOME      = 0.30
 
 
-SLOW_MO  = 25    # 1.0 = real time, 4.0 = 4x slower, 0.5 = 2x faster
+SLOW_MO  = 8    # 1.0 = real time, 4.0 = 4x slower, 0.5 = 2x faster
 
 INTERCEPT, BRAKE, REEL = 0, 1, 2
 STATE_NAMES = {INTERCEPT: "INTERCEPT", BRAKE: "BRAKE", REEL: "REEL"}
@@ -125,9 +125,9 @@ def main():
     model.tendon_lengthspring[tid] = [0.0, P] # models the initial length of the tether
 
     drone_pos0  = data.xpos[bid].copy() #Initial drone position
-    moth.start_pos[2] += 0.5
-    moth.start_pos[1] = 0
-    moth.start_pos[0] = 0
+    moth.start_pos[2] += 1.5
+    moth.start_pos[1] = -2
+    moth.start_pos[0] = 2
     to_moth     = moth.start_pos - drone_pos0 #Vector from drone to moth
     print(moth.start_pos)
     print(to_moth)
@@ -148,15 +148,36 @@ def main():
     max_tension         = 0.0  # peak tether tension over the run [N]
     trajectory_log      = []   # (t, x, y, z, qw, qx, qy, qz) per step
 
+    # --- Report logging / pause-for-screenshot bookkeeping --------------------------------
+    data_log        = []       # (t, speed, accel, dist_covered, tension) per step
+    dist_covered    = 0.0      # cumulative path length flown [m]
+    t_intercept     = 0.0      # intercept phase starts at t=0
+    t_brake_start   = None     # filled when state -> BRAKE
+    t_reel_start    = None     # filled when state -> REEL
+    paused          = False    # viewer pause flag (also toggled by spacebar)
+    pending_pause   = [None]   # label to pause on next loop iteration (set at transitions)
+    did_intercept_pause = False
+    live_g          = 0.0      # instantaneous total g-force for the viewer overlay
+    max_g_run       = 0.0      # peak total g-force over the whole run
+
     def step_logic():
         nonlocal state, P, Pdot, tension, max_tension, t_state_enter, p_brake_start, p_reel_start, max_speed_intercept, max_g_brake, prev_vel, g_force_log, trajectory_log
+        nonlocal data_log, dist_covered, t_brake_start, t_reel_start, did_intercept_pause, live_g, max_g_run
 
         t = data.time
         pos = data.xpos[bid].copy()
         quat = data.xquat[bid].copy()  # [w, x, y, z]
         trajectory_log.append((t, pos[0], pos[1], pos[2], quat[0], quat[1], quat[2], quat[3]))
         vel, _ = aero.body_velocity() #Runs velocity calculations (world frame)
-        speed = float(np.linalg.norm(vel)) #length of vel
+        # Signed radial quantities: project onto the dock->drone direction so that moving away
+        # from the dock is positive and returning toward it is negative.
+        r_vec        = pos - Spool_pos
+        dist_covered = float(np.linalg.norm(r_vec))             # distance from dock [m] (>=0)
+        u_rad        = r_vec / dist_covered if dist_covered > 1e-9 else np.zeros(3)
+        speed = float(np.dot(vel, u_rad))                       # radial speed [m/s] (+away/-back)
+        accel = float(np.dot((vel - prev_vel) / dt, u_rad)) / 9.81  # radial accel [g] (+away/-back)
+        live_g = float(np.linalg.norm(vel - prev_vel) / dt / 9.81)  # total g-force magnitude [g]
+        max_g_run = max(max_g_run, live_g)
 
         drag     = aero.compute_drag()
         L        = float(data.ten_length[tid])
@@ -166,10 +187,8 @@ def main():
         C_TAUT = 2.0 * ZETA * math.sqrt(k_spring * Drone_Mass)  # fraction of critical damping
         # Calculate C directly from the material viscosity, area, and length
         # C_TAUT = (WIRE_A * WIRE_ETA) / L
-        moth_p = moth.position(t)
-        moth_p[2] += 0.5
-        moth_p[1]= 0
-        moth_p[0] = 0
+        # Moth is stationary at a fixed location (x=2, y=-2); moth.start_pos already holds it.
+        moth_p = moth.start_pos.copy()
 
         data.mocap_pos[moth_mid] = moth_p
 
@@ -193,6 +212,8 @@ def main():
                 Pdot = Ldot          # spool initially pays out with the drone (no tension jump)
                 t_state_enter = t
                 p_brake_start = pos.copy()
+                t_brake_start = t
+                pending_pause[0] = "START OF BRAKING"
                 print(f"Max speed during intercept: {max_speed_intercept:.2f} m/s")
 
         elif state == BRAKE:
@@ -220,6 +241,8 @@ def main():
             if v_radial <= 0.0 and (t - t_state_enter) > 0.5 * BRAKE_RAMP:
                 print(f"started braking at {t} seconds")
                 state, t_state_enter = REEL, t
+                t_reel_start = t
+                pending_pause[0] = "START OF REEL-IN"
                 p_reel_start = pos.copy()
                 braking_dist = float(np.linalg.norm(p_reel_start - p_brake_start))
                 print(f"Braking distance: {braking_dist:.3f} m")
@@ -273,12 +296,18 @@ def main():
             damp_force = np.zeros(3)
 
 
+        data_log.append((t, speed, accel, dist_covered, tension))
+        if not did_intercept_pause:
+            did_intercept_pause = True
+            pending_pause[0] = "START OF INTERCEPT"
+
         ctrl.apply_drone_wrench(thrust_cmd, drag, attitude_hold=(state == INTERCEPT))
         data.xfrc_applied[bid, 0:3] += damp_force
         prev_vel = vel.copy()
 
     def reset():
         nonlocal state, P, Pdot, theta0, tension, t_state_enter, t, max_speed_intercept, max_g_brake, prev_vel, g_force_log
+        nonlocal data_log, dist_covered, t_brake_start, t_reel_start, did_intercept_pause
         mujoco.mj_resetData(model, data)
         data.mocap_pos[moth_mid] = moth.start_pos
         mujoco.mj_forward(model, data)
@@ -296,8 +325,12 @@ def main():
         max_g_brake         = 0.0
         prev_vel            = np.zeros(3)
         g_force_log         = []
-
-    paused = False
+        data_log            = []
+        dist_covered        = 0.0
+        t_brake_start       = None
+        t_reel_start        = None
+        did_intercept_pause = False
+        pending_pause[0]    = None
 
     def key_callback(keycode):
         nonlocal paused
@@ -305,6 +338,18 @@ def main():
             reset()
         elif keycode == 32:  # Spacebar
             paused = not paused
+
+    def draw_g_label(scn):
+        # Append the live g-force readout as a labelled marker just above the drone.
+        if scn.ngeom < scn.maxgeom:
+            mujoco.mjv_initGeom(
+                scn.geoms[scn.ngeom], mujoco.mjtGeom.mjGEOM_SPHERE,
+                np.array([0.02, 0.02, 0.02]),
+                data.xpos[bid] + np.array([0.0, 0.0, 0.25]),
+                np.eye(3).flatten(),
+                np.array([1.0, 0.85, 0.1, 0.9]))
+            scn.geoms[scn.ngeom].label = f"{live_g:5.2f} g (max {max_g_run:4.1f} g)"
+            scn.ngeom += 1
 
     t = 0.0
     print(f"The braking started at {p_brake_start}")
@@ -320,6 +365,16 @@ def main():
                 data.qpos[spool_qadr] = theta0 + (P - P0) / R_SPOOL
                 data.qvel[spool_vadr] = Pdot / R_SPOOL
                 t += dt
+                # Auto-pause at phase transitions so a screenshot can be taken for the report.
+                if pending_pause[0] is not None:
+                    paused = True
+                    print(f"\n[PAUSED] {pending_pause[0]} at t={t:.3f}s "
+                          f"— take your screenshot, then press SPACE to resume.\n")
+                    pending_pause[0] = None
+            # Live g-force readout: a labelled marker floating above the drone.
+            scn = viewer.user_scn
+            scn.ngeom = 0
+            draw_g_label(scn)
             viewer.sync()
             elapsed = time.time() - step_start
             time.sleep(max(0, dt * SLOW_MO - elapsed))
@@ -331,14 +386,55 @@ def main():
         writer.writerows(trajectory_log)
     print(f"Trajectory saved to {csv_path} ({len(trajectory_log)} frames)")
 
-    if g_force_log:
-        times, gforces = zip(*g_force_log)
-        plt.figure()
-        plt.plot(times, gforces)
-        plt.xlabel("Time (s)")
-        plt.ylabel("G-force (g)")
-        plt.title("G-force during braking")
-        plt.grid(True)
+    # --- Report figure: speed / acceleration / distance / tension stacked vs. time --------
+    if data_log:
+        t_arr, speed_arr, accel_arr, dist_arr, tension_arr = (np.array(c) for c in zip(*data_log))
+
+        # Cut the plot off 0.75 s after reel-in begins (if it began).
+        if t_reel_start is not None:
+            keep = t_arr <= t_reel_start + 0.75
+            t_arr, speed_arr, accel_arr, dist_arr, tension_arr = (
+                a[keep] for a in (t_arr, speed_arr, accel_arr, dist_arr, tension_arr))
+
+        # Phase-transition markers (skip any phase that was never reached).
+        phases = [("Intercept", t_intercept,   "tab:green"),
+                  ("Braking",   t_brake_start, "tab:orange"),
+                  ("Reel-in",   t_reel_start,  "tab:red")]
+        phases = [(name, tt, col) for (name, tt, col) in phases if tt is not None]
+
+        fig, axes = plt.subplots(4, 1, figsize=(12, 11), sharex=True)
+        series = [(speed_arr,   "Radial speed [m/s]\n(+away / -back)",  "tab:blue",   True),
+                  (accel_arr,   "Radial accel [g]\n(+away / -back)", "tab:purple", True),
+                  (dist_arr,    "Distance from dock [m]", "tab:brown",  False),
+                  (tension_arr, "Tether tension [N]",     "tab:cyan",   False)]
+
+        for ax, (y, label, col, signed) in zip(axes, series):
+            ax.plot(t_arr, y, color=col, linewidth=1.8)
+            ax.set_ylabel(label, fontsize=11)
+            ax.grid(True, alpha=0.3)
+            if signed:
+                ax.axhline(0.0, color="black", linewidth=0.8, alpha=0.6)
+            for name, tt, mcol in phases:
+                ax.axvline(tt, color=mcol, linestyle="--", linewidth=1.5, alpha=0.9)
+
+        # Phase labels along the top axis only (shared x keeps them aligned for all panels).
+        ymax = axes[0].get_ylim()[1]
+        for name, tt, mcol in phases:
+            axes[0].text(tt, ymax, f" {name}", color=mcol, fontsize=10,
+                         fontweight="bold", va="bottom", ha="left", rotation=0)
+
+        axes[-1].set_xlabel("Time [s]", fontsize=12)
+        axes[0].set_title("Drone flight performance vs. time", fontsize=14, fontweight="bold")
+        # One shared legend for the phase markers.
+        handles = [plt.Line2D([0], [0], color=mcol, linestyle="--", linewidth=1.5, label=f"Start of {name.lower()}")
+                   for name, tt, mcol in phases]
+        if handles:
+            axes[0].legend(handles=handles, loc="upper right", fontsize=9)
+
+        fig.tight_layout()
+        out_path = r"Flight_Performance_Simulation\flight_performance.png"
+        fig.savefig(out_path, dpi=150)
+        print(f"Performance figure saved to {out_path}")
         plt.show()
 
 
