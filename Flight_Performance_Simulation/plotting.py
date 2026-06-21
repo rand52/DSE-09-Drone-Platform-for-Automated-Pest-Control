@@ -415,8 +415,8 @@ def main():
                   ("t3",   t_reel_start,  "darkorange")]
         phases = [(name, tt, col) for (name, tt, col) in phases if tt is not None]
 
-        # Maak 2 subplots onder elkaar
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7, 7), sharex=True)
+        # Changed to 1 row, 2 columns, and made the figure wider
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
         # --- Plot 1: Velocity (links) & Acceleration (rechts) ---
         color_v = 'steelblue'
@@ -445,18 +445,25 @@ def main():
         ax2_twin.set_ylabel(r"Stretch $\Delta L$ [mm]", color=color_stretch, fontsize=10)
         ax2_twin.tick_params(axis='y', labelcolor=color_stretch)
 
-        # --- Fase markeringen toevoegen ---
+        # --- Fase markeringen en labels toevoegen ---
+        ymax1 = ax1.get_ylim()[1]
+        ymax2 = ax2.get_ylim()[1]
+
         for name, tt, mcol in phases:
-            # Lijnen doortrekken in beide subplots
+            # Verticale stippellijnen voor beide grafieken
             ax1.axvline(tt, color=mcol, linestyle="--", linewidth=1.2, alpha=0.8)
             ax2.axvline(tt, color=mcol, linestyle="--", linewidth=1.2, alpha=0.8)
 
-        # Labels bovenaan de bovenste grafiek
-        ymax1 = ax1.get_ylim()[1]
-        for name, tt, mcol in phases:
+            # Text labels voor ax1 (linker grafiek)
             ax1.text(tt, ymax1, f" {name}", color=mcol, fontsize=9,
                      fontweight="bold", va="bottom", ha="left", rotation=0)
+            
+            # Text labels voor ax2 (rechter grafiek)
+            ax2.text(tt, ymax2, f" {name}", color=mcol, fontsize=9,
+                     fontweight="bold", va="bottom", ha="left", rotation=0)
 
+        # X-as labels voor beide grafieken (aangezien ze nu naast elkaar staan)
+        ax1.set_xlabel(r"$t$ [s]", fontsize=10)
         ax2.set_xlabel(r"$t$ [s]", fontsize=10)
 
         fig.tight_layout()
